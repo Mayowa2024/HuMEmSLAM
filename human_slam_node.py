@@ -22,6 +22,7 @@ from slam.global_place_descriptor import (
     DescriptorSpec,
     TensorRTGlobalDescriptor,
 )
+from slam.ocr_policy import should_run_ocr_for_object
 from slam.scene_categories import group_places365_probabilities
 from slam.types import KeyframeRecord, SceneRecord, StaticObject, TextAnchor
 
@@ -268,6 +269,15 @@ class HumanSLAMNode(Node):
         self.declare_parameter("ocr_keyframe_interval", 5)
         self.declare_parameter("ocr_max_objects_per_keyframe", 3)
         self.declare_parameter(
+            "ocr_always_classes",
+            [
+                "advertisement_sign",
+                "store_sign",
+                "information_sign",
+                "traffic_sign",
+            ],
+        )
+        self.declare_parameter(
             "ocr_classes",
             [
                 "building",
@@ -415,6 +425,9 @@ class HumanSLAMNode(Node):
             0, int(self.get_parameter("ocr_max_objects_per_keyframe").value)
         )
         self.ocr_classes = set(self.get_parameter("ocr_classes").value)
+        self.ocr_always_classes = set(
+            self.get_parameter("ocr_always_classes").value
+        )
         self.ocr_enable_mkldnn = bool(
             self.get_parameter("ocr_enable_mkldnn").value
         )
@@ -1375,7 +1388,19 @@ class HumanSLAMNode(Node):
             if boxes is None:
                 continue
 
-            for i, box in enumerate(boxes):
+            # Prioritise explicit signs within the bounded OCR budget. Broad
+            # regions such as buildings remain interval-controlled.
+            ordered_indices = sorted(
+                range(len(boxes)),
+                key=lambda index: (
+                    self.yolo.names[int(boxes[index].cls[0])]
+                    not in self.ocr_always_classes,
+                    -float(boxes[index].conf[0]),
+                ),
+            )
+
+            for i in ordered_indices:
+                box = boxes[i]
                 class_id = int(box.cls[0])
                 confidence = float(box.conf[0])
                 class_name = self.yolo.names[class_id]
@@ -1413,10 +1438,13 @@ class HumanSLAMNode(Node):
                 texts = []
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
 
-                should_run_ocr = (
-                    run_ocr
-                    and class_name in self.ocr_classes
-                    and ocr_objects_processed < self.ocr_max_objects
+                should_run_ocr = should_run_ocr_for_object(
+                    run_ocr,
+                    class_name,
+                    self.ocr_classes,
+                    self.ocr_always_classes,
+                    ocr_objects_processed,
+                    self.ocr_max_objects,
                 )
 
                 if should_run_ocr:
