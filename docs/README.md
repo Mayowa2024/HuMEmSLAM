@@ -1,4 +1,4 @@
-# HumanSLAM documentation
+# HuMemSLAM documentation
 
 - `METHODOLOGY.md` — dissertation-ready technical methodology and evaluation
   design.

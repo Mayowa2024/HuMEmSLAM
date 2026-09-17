@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarise HumanSLAM component and ORB bridge latency CSV files."""
+"""Summarise HuMemSLAM component and ORB bridge latency CSV files."""
 
 import argparse
 from collections import Counter

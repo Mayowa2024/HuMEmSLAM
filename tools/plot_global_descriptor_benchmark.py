@@ -91,32 +91,71 @@ def style_axis(axis):
 
 
 def plot_tradeoff(data, models, output):
-    fig, axis = plt.subplots(figsize=(7.2, 4.8), constrained_layout=True)
+    background = "#454D54"
+    foreground = "#F4F4F4"
+    yellow = "#F9C909"
+    presentation_colours = {
+        "places365_resnet50_embedding": "#9EA4A9",
+        "eigenplaces_r18_512": yellow,
+        "mixvpr_r50_512": "#C2C6C9",
+        "salad": "#858B90",
+    }
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Liberation Sans"],
+        "font.size": 18,
+        "text.color": foreground,
+        "axes.labelcolor": foreground,
+        "xtick.color": foreground,
+        "ytick.color": foreground,
+        "svg.fonttype": "none",
+    })
+    fig, axis = plt.subplots(figsize=(12.8, 7.2), constrained_layout=True)
+    fig.patch.set_facecolor(background)
+    axis.set_facecolor(background)
     offsets = {
-        "places365_resnet50_embedding": (8, 6),
-        "eigenplaces_r18_512": (8, 7),
-        "mixvpr_r50_512": (12, 22),
-        "salad": (8, 6),
+        "places365_resnet50_embedding": (14, 8),
+        "eigenplaces_r18_512": (14, -58),
+        "mixvpr_r50_512": (18, 12),
+        "salad": (-18, -52),
+    }
+    alignments = {
+        "salad": "right",
     }
     for model in models:
         stats = aggregate(data[model])
         axis.scatter(
-            stats["latency"], stats["margin"], s=90,
-            color=COLORS.get(model), edgecolor="black", linewidth=0.6,
+            stats["latency"], stats["margin"], s=430,
+            color=presentation_colours.get(model, "#B8BDC2"),
+            edgecolor=foreground, linewidth=1.6,
             zorder=3,
         )
+        method_name = DISPLAY_NAMES.get(model, model)
+        if model == "eigenplaces_r18_512":
+            method_name = "EigenPlaces (HuMem-VPR)"
         axis.annotate(
-            f'{DISPLAY_NAMES.get(model, model)}\nR@1={stats["recall"]:.2f}',
+            f'{method_name}\nR@1 = {stats["recall"]:.2f}',
             (stats["latency"], stats["margin"]),
             xytext=offsets.get(model, (6, 6)),
-            textcoords="offset points", fontsize=9,
+            textcoords="offset points", fontsize=19,
+            ha=alignments.get(model, "left"),
+            color=yellow if model == "eigenplaces_r18_512" else foreground,
+            weight="bold",
         )
-    axis.set_xlabel("Mean warmed TensorRT inference latency (ms) ↓")
-    axis.set_ylabel("Mean positive–hardest-negative separation ↑")
-    axis.set_title("Global descriptor accuracy–latency trade-off")
-    style_axis(axis)
-    fig.savefig(output / "accuracy_latency_tradeoff.png", dpi=220)
-    fig.savefig(output / "accuracy_latency_tradeoff.pdf")
+    axis.set_xlabel("Mean warmed inference latency (ms)", fontsize=22,
+                    weight="bold", labelpad=12)
+    axis.set_ylabel("Positive–hardest-negative separation", fontsize=22,
+                    weight="bold", labelpad=12)
+    axis.set_xlim(3.1, 13.7)
+    axis.set_ylim(0.02, 0.41)
+    axis.tick_params(labelsize=18)
+    axis.grid(True, color="white", alpha=0.10, linewidth=0.8)
+    for spine in axis.spines.values():
+        spine.set_visible(False)
+    fig.savefig(output / "accuracy_latency_tradeoff.png", dpi=300,
+                bbox_inches="tight", facecolor=background)
+    fig.savefig(output / "accuracy_latency_tradeoff.svg",
+                bbox_inches="tight", facecolor=background)
     plt.close(fig)
 
 

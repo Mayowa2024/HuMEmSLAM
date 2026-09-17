@@ -59,9 +59,9 @@ def main():
 
     specs = {
         "normal_orbslam3": ("normal/orbslam3_baseline", "Normal ORB-SLAM3", "#1f77b4"),
-        "normal_humanslam": ("normal/humanslam", "Normal HumanSLAM", "#2ca02c"),
+        "normal_humanslam": ("normal/humanslam", "Normal HuMemSLAM", "#2ca02c"),
         "perturbed_orbslam3": ("perturbed/orbslam3_baseline", "Perturbed ORB-SLAM3", "#d62728"),
-        "perturbed_humanslam": ("perturbed/humanslam", "Perturbed HumanSLAM", "#9467bd"),
+        "perturbed_humanslam": ("perturbed/humanslam", "Perturbed HuMemSLAM", "#9467bd"),
     }
     plot_dir, metric_dir = args.iteration / "plots", args.iteration / "metrics"
     plot_dir.mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,7 @@ def main():
         plt.close(fig)
 
     error_plot(list(specs), "kitti06_iteration02_error_vs_frame_first_pose.png", "KITTI 06 iteration 02: frame-local trajectory error")
-    error_plot(["perturbed_orbslam3", "perturbed_humanslam"], "perturbed_orbslam3_vs_humanslam_error_vs_frame.png", "Perturbed KITTI 06: ORB-SLAM3 vs HumanSLAM")
+    error_plot(["perturbed_orbslam3", "perturbed_humanslam"], "perturbed_orbslam3_vs_humanslam_error_vs_frame.png", "Perturbed KITTI 06: ORB-SLAM3 vs HuMemSLAM")
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     for ax, key in zip(axes.flat, specs):

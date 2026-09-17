@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare HumanSLAM and ORB on real revisits transformed to synthetic night."""
+"""Compare HuMemSLAM and ORB on real revisits transformed to synthetic night."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import rclpy
 from run_night_orb_humanslam_microtests import (
     PROFILES, make_night, semantic_record,
 )
-from slam.human_slam_node import HumanSLAMNode
+from slam.human_slam_node import HuMemSLAMNode
 
 
 def arguments():
@@ -87,7 +87,7 @@ def add_nonuniform_lighting(image, severity, seed):
     height, width = image.shape[:2]
     yy, xx = np.mgrid[0:height, 0:width]
     value = image.astype(np.float32)
-    # Large irregular shadow regions emulate incomplete street illumination.
+
     shadow = np.ones((height, width), dtype=np.float32)
     for _ in range(2):
         cx, cy = rng.uniform(0, width), rng.uniform(height * .15, height)
@@ -95,7 +95,7 @@ def add_nonuniform_lighting(image, severity, seed):
         gaussian = np.exp(-(((xx - cx) / sx) ** 2 + ((yy - cy) / sy) ** 2) / 2)
         shadow *= 1.0 - severity * rng.uniform(.25, .5) * gaussian
     value *= shadow[..., None]
-    # One clipped light/bloom source; its location is deterministic per pair.
+
     cx, cy = rng.uniform(width * .15, width * .85), rng.uniform(0, height * .42)
     sigma = rng.uniform(width * .025, width * .07)
     bloom = np.exp(-(((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma * sigma)))
@@ -156,7 +156,7 @@ def main():
         writer.writerows(pairs)
     examples = args.output / "examples"; examples.mkdir(exist_ok=True)
     rclpy.init(args=["--ros-args", "--params-file", str(args.params)])
-    node = HumanSLAMNode(); rows = []
+    node = HuMemSLAMNode(); rows = []
     try:
         for pair_index, (query_id, candidate_id, distance, angle) in enumerate(pairs):
             candidate_image = cv2.imread(str(paths[candidate_id]))
@@ -218,9 +218,9 @@ def main():
         }, indent=2) + "\n")
         x = np.arange(len(summaries)); fig, left = plt.subplots(figsize=(10, 5.8))
         left.plot(x, [s["human_score_mean"] for s in summaries], marker="o",
-                  label="HumanSLAM score"); left.axhline(args.human_threshold,
+                  label="HuMemSLAM score"); left.axhline(args.human_threshold,
                   linestyle="--", label="Human threshold"); left.set_ylim(0, 1)
-        left.set_ylabel("HumanSLAM score"); right = left.twinx()
+        left.set_ylabel("HuMemSLAM score"); right = left.twinx()
         right.plot(x, [s["orb_inliers_mean"] for s in summaries], marker="s",
                    color="tab:red", label="ORB/F inliers")
         right.axhline(args.orb_min_inliers, color="tab:red", linestyle="--",

@@ -12,7 +12,7 @@ import numpy as np
 import rclpy
 
 from run_duplicate_image_microtests import object_assignment_audit, process
-from slam.human_slam_node import HumanSLAMNode
+from slam.human_slam_node import HuMemSLAMNode
 from slam.scene_categories import category_compatibility
 
 
@@ -32,7 +32,7 @@ def main():
                     if path.suffix.lower() in {".png", ".jpg", ".jpeg"})
     args.output.mkdir(parents=True, exist_ok=True)
     rclpy.init(args=["--ros-args", "--params-file", str(args.params)])
-    node = HumanSLAMNode()
+    node = HuMemSLAMNode()
     summaries = []
     try:
         for run_number, base_id in enumerate(args.base_frame_ids, start=1):
@@ -47,7 +47,7 @@ def main():
                 candidate_records.append(record)
                 perception_rows.append({"frame_id": frame_id, **latency})
 
-            # Process the base image again as a genuinely independent query.
+
             query_image = cv2.imread(str(images[base_id]), cv2.IMREAD_COLOR)
             query, query_latency = process(node, query_image, base_id)
             ranked = []
@@ -146,7 +146,7 @@ def main():
             writer.writerows(summaries)
         top1 = sum(item["top1_is_original"] for item in summaries)
         scores = [item["original_unified_score"] for item in summaries]
-        readme = f"""# HumanSLAM duplicate revisit after ten intervening frames
+        readme = f"""# HuMemSLAM duplicate revisit after ten intervening frames
 
 Date: 2026-08-08
 

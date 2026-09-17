@@ -43,6 +43,14 @@ class CognitiveMathModel:
         text_conflict_floor: float = 0.25,
         use_scene_category: bool = True,
         scene_category_weight: float = 0.10,
+        object_class_weights: Optional[dict] = None,
+        relative_layout_weight: float = 0.15,
+        relative_layout_sigma: float = 0.25,
+        persistence_gain: float = 0.25,
+        object_appearance_weight: float = 0.0,
+        fusion_mode: str = "tri_layer",
+        object_support_gain: float = 0.15,
+        text_support_gain: float = 0.25,
     ) -> None:
         self.w_scene = float(w_scene)
         self.w_object = float(w_object)
@@ -62,13 +70,27 @@ class CognitiveMathModel:
         self.scene_category_weight = self._clamp(
             scene_category_weight, 0.0, 1.0
         )
+        self.object_class_weights = {
+            str(name): self._clamp(float(weight), 0.0, 1.0)
+            for name, weight in (object_class_weights or {}).items()
+        }
+        self.relative_layout_weight = self._clamp(
+            float(relative_layout_weight), 0.0, 1.0
+        )
+        self.relative_layout_sigma = max(1e-6, float(relative_layout_sigma))
+        self.persistence_gain = max(0.0, float(persistence_gain))
+        self.object_appearance_weight = self._clamp(
+            float(object_appearance_weight), 0.0, 1.0
+        )
+        if fusion_mode not in {"tri_layer", "scene_support"}:
+            raise ValueError(f"Unsupported fusion mode: {fusion_mode}")
+        self.fusion_mode = fusion_mode
+        self.object_support_gain = self._clamp(object_support_gain, 0.0, 1.0)
+        self.text_support_gain = self._clamp(text_support_gain, 0.0, 1.0)
 
         if not any((self.use_scene, self.use_object, self.use_text)):
             raise ValueError("At least one cognitive layer must be enabled")
 
-    # ------------------------------------------------------------------
-    # Layer 1: Scene sequence similarity
-    # ------------------------------------------------------------------
 
     def scene_similarity(
         self,
@@ -120,23 +142,19 @@ class CognitiveMathModel:
                     c_scene.category_distribution,
                 )
                 if q_scene.category_distribution and c_scene.category_distribution:
-                    # A bounded modulation: exact category agreement preserves
-                    # the embedding score; disagreement can only reduce it by
-                    # at most the configured fraction.
+
+
+
                     feature_sim *= (
                         1.0 + self.scene_category_weight * compatibility
                     ) / (1.0 + self.scene_category_weight)
 
-            # Classifier confidence describes certainty in the scene label; it
-            # is not the reliability of the retrieval embedding. Multiplying
-            # two confidences previously suppressed even identical places.
+
+
             score += float(weights[idx]) * feature_sim
 
         return self._clamp(float(score), 0.0, 1.0)
 
-    # ------------------------------------------------------------------
-    # Layer 2: Segmentation-based static object similarity
-    # ------------------------------------------------------------------
 
     def mask_distance(self, q_obj: StaticObject, c_obj: StaticObject) -> float:
         """
@@ -177,12 +195,35 @@ class CognitiveMathModel:
         if q_obj.class_name != c_obj.class_name:
             return 0.0
 
-        q_conf = self._clamp(q_obj.seg_conf, 0.0, 1.0)
-        c_conf = self._clamp(c_obj.seg_conf, 0.0, 1.0)
+        def persistent_confidence(obj):
+            confidence = self._clamp(obj.seg_conf, 0.0, 1.0)
+            observations = max(1, int(getattr(obj, "observation_count", 1)))
+            return 1.0 - (1.0 - confidence) / (
+                1.0 + self.persistence_gain * (observations - 1)
+            )
+
+        q_conf = persistent_confidence(q_obj)
+        c_conf = persistent_confidence(c_obj)
         s_geom = self.spatial_similarity(q_obj, c_obj)
 
         reliability = math.sqrt(q_conf * c_conf)
-        return self._clamp(reliability * s_geom, 0.0, 1.0)
+        similarity = s_geom
+        q_embedding = getattr(q_obj, "appearance_embedding", None)
+        c_embedding = getattr(c_obj, "appearance_embedding", None)
+        if (
+            self.object_appearance_weight > 0.0
+            and q_embedding is not None and c_embedding is not None
+        ):
+            cosine = float(np.dot(
+                np.asarray(q_embedding).reshape(-1),
+                np.asarray(c_embedding).reshape(-1),
+            ))
+            appearance = self._clamp((cosine + 1.0) * 0.5, 0.0, 1.0)
+            similarity = (
+                (1.0 - self.object_appearance_weight) * s_geom
+                + self.object_appearance_weight * appearance
+            )
+        return self._clamp(reliability * similarity, 0.0, 1.0)
 
     def object_similarity(
         self,
@@ -204,6 +245,13 @@ class CognitiveMathModel:
             return 0.0
 
         matched_score = 0.0
+        assignments = []
+        query_weight = sum(
+            self.object_class_weights.get(item.class_name, 1.0)
+            for item in q_objects
+        )
+        if query_weight <= 0.0:
+            return 0.0
         classes = {item.class_name for item in q_objects}
         for class_name in classes:
             query_class = [item for item in q_objects
@@ -220,13 +268,48 @@ class CognitiveMathModel:
             query_indices, candidate_indices = linear_sum_assignment(
                 scores, maximize=True
             )
-            matched_score += float(scores[query_indices, candidate_indices].sum())
+            class_weight = self.object_class_weights.get(class_name, 1.0)
+            matched_score += class_weight * float(
+                scores[query_indices, candidate_indices].sum()
+            )
+            assignments.extend(
+                (query_class[q_index], candidate_class[c_index], class_weight)
+                for q_index, c_index in zip(query_indices, candidate_indices)
+            )
 
-        return self._clamp(matched_score / len(q_objects), 0.0, 1.0)
+        assignment_score = self._clamp(
+            matched_score / query_weight, 0.0, 1.0
+        )
+        if self.relative_layout_weight <= 0.0 or len(assignments) < 2:
+            return assignment_score
 
-    # ------------------------------------------------------------------
-    # Layer 3: Object-grounded text similarity
-    # ------------------------------------------------------------------
+        relation_total = 0.0
+        relation_weight = 0.0
+        for first in range(len(assignments)):
+            q_first, c_first, first_weight = assignments[first]
+            for second in range(first + 1, len(assignments)):
+                q_second, c_second, second_weight = assignments[second]
+                q_dx = q_second.x_centroid - q_first.x_centroid
+                q_dy = q_second.y_centroid - q_first.y_centroid
+                c_dx = c_second.x_centroid - c_first.x_centroid
+                c_dy = c_second.y_centroid - c_first.y_centroid
+                distance = math.hypot(q_dx - c_dx, q_dy - c_dy)
+                similarity = math.exp(-(
+                    distance * distance
+                    / (2.0 * self.relative_layout_sigma ** 2)
+                ))
+                weight = math.sqrt(first_weight * second_weight)
+                relation_total += weight * similarity
+                relation_weight += weight
+        if relation_weight <= 0.0:
+            return assignment_score
+        relation_score = relation_total / relation_weight
+        return self._clamp(
+            (1.0 - self.relative_layout_weight) * assignment_score
+            + self.relative_layout_weight * relation_score,
+            0.0, 1.0,
+        )
+
 
     def text_gate(self, q_obj: StaticObject, c_obj: StaticObject) -> bool:
         """
@@ -399,9 +482,6 @@ class CognitiveMathModel:
             1.0,
         )
 
-    # ------------------------------------------------------------------
-    # Unified score and candidate selection
-    # ------------------------------------------------------------------
 
     def unified_score(
         self,
@@ -414,7 +494,9 @@ class CognitiveMathModel:
         Computes Lambda(Q_t, C_i).
 
         Scene uses a three-scene sequence.
-        Objects and text use only current query keyframe vs candidate keyframe.
+        Objects and text use the supplied semantic keyframe records. HuMemSLAM
+        may enrich those records from a small local neighbourhood before this
+        model is called; the centre keyframe identity and pose are preserved.
         """
 
         return self.score_breakdown(
@@ -481,8 +563,8 @@ class CognitiveMathModel:
                 s_text, _ = self.text_similarity(
                     query_keyframe, candidate_keyframe
                 )
-                # Candidate evidence cannot increase the query-selected layer
-                # above one, but missing/weaker candidate OCR is penalised.
+
+
                 shared_strength = min(
                     query_text_strength, candidate_text_strength
                 )
@@ -493,6 +575,25 @@ class CognitiveMathModel:
                     self.w_text * query_text_strength,
                     s_text * reliability_ratio,
                 ))
+
+        if self.fusion_mode == "scene_support" and result["scene_score"] is not None:
+            scene_score = float(result["scene_score"])
+            support = 0.0
+            if result["object_score"] is not None:
+                support += self.object_support_gain * float(result["object_score"])
+            if result["text_score"] is not None:
+                support += (
+                    self.text_support_gain
+                    * float(result["text_evidence"])
+                    * float(result["text_score"])
+                )
+            result["support_score"] = self._clamp(support, 0.0, 1.0)
+            result["unified_score"] = self._clamp(
+                scene_score + (1.0 - scene_score) * result["support_score"],
+                0.0,
+                1.0,
+            )
+            return result
 
         denominator = sum(weight for weight, _ in weighted_scores)
         if denominator <= 0.0:
@@ -546,9 +647,6 @@ class CognitiveMathModel:
 
         return n_inliers < geom_threshold and semantic_score > self.semantic_threshold
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     def _normalize(self, vec: np.ndarray) -> np.ndarray:
         vec = np.asarray(vec, dtype=np.float32)

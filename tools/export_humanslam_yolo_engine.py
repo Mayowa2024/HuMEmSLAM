@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export the frozen HumanSLAM YOLO segmentation checkpoint to TensorRT."""
+"""Export the frozen HuMemSLAM YOLO segmentation checkpoint to TensorRT."""
 
 import argparse
 import hashlib

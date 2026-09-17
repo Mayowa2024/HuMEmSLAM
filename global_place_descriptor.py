@@ -1,7 +1,7 @@
 """TensorRT runtime and configuration for global place descriptors.
 
 The runtime is deliberately independent of ROS so the exact same inference
-path can be used by HumanSLAM and by the controlled descriptor benchmark.
+path can be used by HuMemSLAM and by the controlled descriptor benchmark.
 """
 
 from dataclasses import dataclass

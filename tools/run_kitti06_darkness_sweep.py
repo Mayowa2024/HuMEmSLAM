@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run paired repeated ORB-SLAM3/HumanSLAM KITTI 06 darkness trials."""
+"""Run paired repeated ORB-SLAM3/HuMemSLAM KITTI 06 darkness trials."""
 
 from __future__ import annotations
 
@@ -134,7 +134,7 @@ def main() -> None:
         "perturbation_frames_inclusive": [args.start_frame, args.end_frame],
         "darkening_levels_percent": levels,
         "runs_per_condition_per_level": run_count,
-        "conditions": ["ORB-SLAM3 baseline", "HumanSLAM only"],
+        "conditions": ["ORB-SLAM3 baseline", "HuMemSLAM only"],
         "semantic_threshold": args.semantic_threshold,
         "total_planned_runs": len(levels) * run_count * 2,
     }
@@ -143,8 +143,8 @@ def main() -> None:
     )
 
     datasets = {level: generate_dataset(args, level) for level in levels}
-    # Pair baseline and HumanSLAM runs at each severity to reduce time/thermal
-    # confounding between the two conditions.
+
+
     for level in levels:
         for run_number in range(1, run_count + 1):
             run_trial(args, datasets[level], level, run_number, human=False)

@@ -55,8 +55,8 @@ def main():
             continue
         wall = int(track["wall_time_ns"]) * 1e-9
         elapsed = wall - first_wall
-        # ORB logs after TrackStereo completes. searchsorted therefore lands on
-        # the next 30 Hz exposure; the preceding timestamp is the input frame.
+
+
         best_id = max(0, int(np.searchsorted(times, times[0] + elapsed)) - 1)
         best_id = min(best_id, len(images) - 1)
         rows.append({

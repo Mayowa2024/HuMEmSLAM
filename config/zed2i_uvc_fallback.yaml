@@ -1,0 +1,10 @@
+usb_cam:
+  ros__parameters:
+    video_device: "/dev/video0"
+    image_width: 1344
+    image_height: 376
+    pixel_format: "yuyv"
+    framerate: 15.0
+    camera_frame_id: "zed_camera_center"
+    image_raw:
+      enable_pub_plugins: ["image_transport/raw"]

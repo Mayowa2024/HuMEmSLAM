@@ -1,0 +1,45 @@
+{
+  "detector_engine": "PP-OCRv5_mobile_det.engine",
+  "recognizer_engine": "en_PP-OCRv5_mobile_rec.engine",
+  "precision": "TensorRT 11 FP16-eligible kernels",
+  "detector_profile": [
+    [
+      1,
+      3,
+      32,
+      32
+    ],
+    [
+      1,
+      3,
+      320,
+      640
+    ],
+    [
+      1,
+      3,
+      640,
+      640
+    ]
+  ],
+  "recognizer_profile": [
+    [
+      1,
+      3,
+      48,
+      320
+    ],
+    [
+      4,
+      3,
+      48,
+      320
+    ],
+    [
+      18,
+      3,
+      48,
+      640
+    ]
+  ]
+}

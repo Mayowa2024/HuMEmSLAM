@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate HumanSLAM candidate rankings against KITTI ground-truth position."""
+"""Evaluate HuMemSLAM candidate rankings against KITTI ground-truth position."""
 
 import argparse
 import csv
@@ -118,7 +118,7 @@ def evaluate(args):
     axis.set_ylim(0.0, 1.05)
     axis.set_xlabel("K")
     axis.set_ylabel("Recall@K")
-    axis.set_title("HumanSLAM pose-ground-truth retrieval")
+    axis.set_title("HuMemSLAM pose-ground-truth retrieval")
     axis.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(args.output_dir / "retrieval_recall_at_k.png", dpi=180)

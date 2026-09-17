@@ -10,9 +10,9 @@ from slam.types import SceneRecord
 
 def test_places365_top_k_is_grouped_and_normalised():
     probabilities = np.zeros(365, dtype=np.float32)
-    probabilities[319] = 0.5  # street -> urban_road
-    probabilities[283] = 0.3  # residential_neighborhood -> residential
-    probabilities[67] = 0.2   # building_facade -> urban_road
+    probabilities[319] = 0.5
+    probabilities[283] = 0.3
+    probabilities[67] = 0.2
 
     grouped = group_places365_probabilities(probabilities, top_k=3)
 

@@ -52,6 +52,12 @@ class StaticObject:
     y_centroid: float
     area: float
     texts: List[TextAnchor] = field(default_factory=list)
+    observation_count: int = 1
+
+
+    appearance_embedding: Optional[np.ndarray] = None
+    appearance_model: str = ""
+    landmark_track_id: Optional[int] = None
 
 
 @dataclass
@@ -65,11 +71,11 @@ class KeyframeRecord:
     scene: SceneRecord
     static_objects: List[StaticObject] = field(default_factory=list)
 
-    # Optional pose/local map references from ORB-SLAM3.
+
     pose: Optional[np.ndarray] = None
     orb_keyframe_id: Optional[int] = None
     orb_map_id: Optional[int] = None
     tracking_inliers: Optional[int] = None
-    # Original dataset/ORB frame that produced this semantic record.  This is
-    # distinct from ORB's keyframe ID and is required for visual evaluation.
+
+
     source_frame_id: Optional[int] = None

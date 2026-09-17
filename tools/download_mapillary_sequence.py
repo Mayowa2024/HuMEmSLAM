@@ -32,7 +32,7 @@ def get_json(url, token):
     separator = "&" if "?" in url else "?"
     request = urllib.request.Request(
         f"{url}{separator}{urllib.parse.urlencode({'access_token': token})}",
-        headers={"User-Agent": "HumanSLAM-research/1.0"},
+        headers={"User-Agent": "HuMemSLAM-research/1.0"},
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.load(response)
@@ -59,7 +59,7 @@ def image_metadata(image_id, quality, token):
 
 
 def download(url, destination):
-    request = urllib.request.Request(url, headers={"User-Agent": "HumanSLAM-research/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "HuMemSLAM-research/1.0"})
     with urllib.request.urlopen(request, timeout=60) as response:
         destination.write_bytes(response.read())
 

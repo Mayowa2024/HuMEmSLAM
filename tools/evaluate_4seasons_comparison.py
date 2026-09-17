@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Evaluate paired 4Seasons ORB-SLAM3 baseline and HumanSLAM runs."""
+"""Evaluate paired 4Seasons ORB-SLAM3 baseline and HuMemSLAM runs."""
 
 import argparse
 import csv
 import json
+import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -14,6 +15,10 @@ def arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sequence", type=Path, required=True)
     parser.add_argument("--results", type=Path, required=True)
+    parser.add_argument(
+        "--mode", choices=("baseline", "humanslam", "both"), default="both",
+        help="Evaluate one method directory or the default paired comparison.",
+    )
     return parser.parse_args()
 
 
@@ -50,6 +55,20 @@ def tracked_frame_ids(path):
     return np.asarray(ids, dtype=int), np.asarray(latencies)
 
 
+def trajectory_frame_ids(path):
+    """Return the dataset frame associated with every exported trajectory row."""
+    ids = []
+    with path.open(newline="", encoding="utf-8") as stream:
+        for row in csv.DictReader(stream):
+            source = row.get("source_frame_id", "")
+            match = re.search(r"dataset_frame=(\d+)", source)
+            if match:
+                ids.append(int(match.group(1)))
+            else:
+                ids.append(int(row["frame_id"]))
+    return np.asarray(ids, dtype=int)
+
+
 def rigid_align(source, target):
     source_mean, target_mean = source.mean(0), target.mean(0)
     covariance = (source - source_mean).T @ (target - target_mean)
@@ -64,10 +83,20 @@ def rigid_align(source, target):
 
 def load_run(directory, times, reference_file):
     estimate = estimated_positions(directory / "trajectory_kitti.txt")
-    frame_ids, latency = tracked_frame_ids(directory / "orb_events_latency.csv")
-    # ORB's KITTI export omits initialization frames. Its final poses align
-    # with the final successful TrackStereo calls in chronological order.
-    frame_ids = frame_ids[-len(estimate):]
+    _, latency = tracked_frame_ids(directory / "orb_events_latency.csv")
+    association = directory / "trajectory_frame_ids.csv"
+    if association.exists():
+        frame_ids = trajectory_frame_ids(association)
+        if len(frame_ids) != len(estimate):
+            raise ValueError(
+                f"trajectory association has {len(frame_ids)} rows but "
+                f"trajectory has {len(estimate)} poses: {directory}"
+            )
+    else:
+
+
+        frame_ids, _ = tracked_frame_ids(directory / "orb_events_latency.csv")
+        frame_ids = frame_ids[-len(estimate):]
     valid = (frame_ids >= 0) & (frame_ids < len(times))
     frame_ids, estimate = frame_ids[valid], estimate[valid]
     target_times = times[frame_ids]
@@ -85,6 +114,8 @@ def load_run(directory, times, reference_file):
 
 def metrics(data):
     error, rpe, latency = data["errors"], data["rpe"], data["latency"]
+    estimate_length = float(np.linalg.norm(np.diff(data["estimate"], axis=0), axis=1).sum())
+    reference_length = float(np.linalg.norm(np.diff(data["reference"], axis=0), axis=1).sum())
     return {
         "matched_poses": int(len(error)),
         "ape_rmse_m": float(np.sqrt(np.mean(error ** 2))),
@@ -94,6 +125,9 @@ def metrics(data):
         "rpe_translation_rmse_m": float(np.sqrt(np.mean(rpe ** 2))),
         "tracking_latency_mean_ms": float(np.mean(latency)),
         "tracking_latency_p95_ms": float(np.percentile(latency, 95)),
+        "estimated_path_length_m": estimate_length,
+        "reference_path_length_m": reference_length,
+        "path_length_ratio": estimate_length / reference_length,
     }
 
 
@@ -105,12 +139,13 @@ def main():
     metrics_dir.mkdir(parents=True, exist_ok=True)
     times = camera_times(args.sequence / "times.txt")
     reference_file = args.sequence / "result.txt"
-    runs = {
-        "ORB-SLAM3": load_run(args.results / "baseline", times, reference_file),
-        "ORB-SLAM3 + HumanSLAM": load_run(
-            args.results / "humanslam", times, reference_file
-        ),
-    }
+    runs = {}
+    if args.mode in ("baseline", "both"):
+        runs["ORB-SLAM3"] = load_run(
+            args.results / "baseline", times, reference_file)
+    if args.mode in ("humanslam", "both"):
+        runs["ORB-SLAM3 + HuMemSLAM"] = load_run(
+            args.results / "humanslam", times, reference_file)
     summary = {name: metrics(data) for name, data in runs.items()}
     (metrics_dir / "summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
@@ -131,6 +166,22 @@ def main():
         axis.legend()
     fig.tight_layout()
     fig.savefig(plots / "trajectory_and_ape.png", dpi=180)
+    plt.close(fig)
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    planes = ((0, 1, "x", "y"), (0, 2, "x", "z"), (1, 2, "y", "z"))
+    for axis, (a, b, xlabel, ylabel) in zip(axes, planes):
+        axis.plot(reference[:, a], reference[:, b], "k", lw=1.7, label="Ground truth")
+        for (name, data), colour in zip(runs.items(), colours):
+            axis.plot(data["estimate"][:, a], data["estimate"][:, b], colour,
+                      lw=1, label=name)
+        axis.set(xlabel=f"{xlabel} (m)", ylabel=f"{ylabel} (m)",
+                 title=f"Aligned {xlabel.upper()}{ylabel.upper()} trajectory")
+        axis.axis("equal")
+        axis.grid(alpha=.25)
+        axis.legend()
+    fig.tight_layout()
+    fig.savefig(plots / "ground_truth_vs_estimate.png", dpi=180)
     plt.close(fig)
 
     fig, axis = plt.subplots(figsize=(8, 4.5))

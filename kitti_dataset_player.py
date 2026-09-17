@@ -117,7 +117,7 @@ class KittiDatasetPlayer(Node):
                 f"(decimation={self.imu_decimation})"
             )
         self.get_logger().info(
-            "Waiting for ORB-SLAM3/HumanSLAM subscribers before playback"
+            "Waiting for ORB-SLAM3/HuMemSLAM subscribers before playback"
         )
         self.timer = self.create_timer(
             max(self.startup_delay, 0.01), self._start_playback
@@ -147,8 +147,8 @@ class KittiDatasetPlayer(Node):
                 continue
             try:
                 fields = value.split()
-                # KITTI stores one relative-seconds value. 4Seasons stores
-                # timestamp_ns, timestamp_seconds, exposure_seconds.
+
+
                 timestamps.append(
                     float(fields[1]) if len(fields) >= 2 else float(fields[0])
                 )
@@ -191,7 +191,7 @@ class KittiDatasetPlayer(Node):
                     f"Expected 7 IMU fields at {path}:{line_number}"
                 )
             values = [float(value) for value in fields]
-            # 4Seasons: timestamp_ns wx wy wz ax ay az.
+
             samples.append((values[0] * 1e-9, *values[1:]))
         if not samples:
             raise ValueError(f"No IMU samples found in: {path}")
@@ -262,13 +262,13 @@ class KittiDatasetPlayer(Node):
         right_msg = self.bridge.cv2_to_imgmsg(right, encoding=right_encoding)
         for message in (left_msg, right_msg):
             self._set_stamp(message, timestamp)
-            # Preserve the original offline dataset index across DDS/ORB frame
-            # drops. The wrapper records it with tracked feature coordinates.
+
+
             message.header.frame_id = f"{self.frame_id}|dataset_frame={index}"
 
-        # Large raw stereo images can otherwise enter DDS back-to-back and
-        # starve one subscription callback.  A small separation preserves the
-        # common timestamp while giving the left sample time to be delivered.
+
+
+
         self.left_pub.publish(left_msg)
         if self.stereo_publish_gap > 0.0:
             time.sleep(self.stereo_publish_gap)
@@ -306,8 +306,8 @@ class KittiDatasetPlayer(Node):
     def _finish(self):
         self.timer.cancel()
         self.get_logger().info("Offline dataset player finished")
-        # Calling shutdown directly from the executor callback deadlocks while
-        # the executor waits for that same callback to return.
+
+
         threading.Thread(target=rclpy.shutdown, daemon=True).start()
 
 

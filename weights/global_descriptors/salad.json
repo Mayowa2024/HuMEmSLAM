@@ -1,0 +1,11 @@
+{
+  "name": "salad",
+  "engine_path": "salad.engine",
+  "onnx_path": "salad.onnx",
+  "input_height": 322,
+  "input_width": 322,
+  "input_name": "images",
+  "output_name": "descriptor",
+  "normalization": "ImageNet mean/std; output L2 normalised",
+  "precision": "TensorRT FP16-eligible"
+}

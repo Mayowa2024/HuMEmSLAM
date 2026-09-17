@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure HumanSLAM self-match robustness under progressive darkening."""
+"""Measure HuMemSLAM self-match robustness under progressive darkening."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rclpy
 
-from slam.human_slam_node import HumanSLAMNode
+from slam.human_slam_node import HuMemSLAMNode
 from slam.scene_categories import category_compatibility
 from slam.types import KeyframeRecord
 
@@ -103,7 +103,7 @@ def main():
     boundary_dir.mkdir(exist_ok=True)
 
     rclpy.init(args=["--ros-args", "--params-file", str(args.params)])
-    node = HumanSLAMNode()
+    node = HuMemSLAMNode()
     rows = []
     try:
         for run_number, frame_id in enumerate(args.frame_ids, start=1):
@@ -238,7 +238,7 @@ def main():
         ax.plot(ordered, mean, color="black", linewidth=2.5, label="10-image mean")
         ax.fill_between(ordered, mean - std, mean + std, color="black", alpha=0.12, label="±1 SD")
         ax.axhline(args.threshold, color="#d62728", linestyle="--", linewidth=2, label=f"threshold {args.threshold:.2f}")
-        ax.set(title="HumanSLAM self-match under progressive brightness reduction", xlabel="Brightness retained (lower = darker)", ylabel="Unified HumanSLAM score", ylim=(0, 1.02))
+        ax.set(title="HuMemSLAM self-match under progressive brightness reduction", xlabel="Brightness retained (lower = darker)", ylabel="Unified HuMemSLAM score", ylim=(0, 1.02))
         ax.grid(alpha=0.25)
         ax.legend()
         fig.tight_layout()

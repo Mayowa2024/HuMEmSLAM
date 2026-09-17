@@ -9,6 +9,7 @@ metrics from ORB-SLAM3's orb_events.csv instrumentation.
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
 import json
 import math
@@ -61,6 +62,10 @@ def main() -> None:
     parser.add_argument("--keyframes", type=Path, required=True)
     parser.add_argument("--ground-truth", type=Path, required=True,
                         help="KITTI poses.txt (one 3x4 camera pose per frame)")
+    parser.add_argument(
+        "--times", type=Path,
+        help="Dataset timestamps used to map ORB internal frames to source frames.",
+    )
     parser.add_argument("--position-threshold-m", type=float, default=5.0)
     parser.add_argument("--rotation-threshold-deg", type=float, default=30.0)
     parser.add_argument("--min-frame-separation", type=int, default=100)
@@ -70,7 +75,27 @@ def main() -> None:
     poses = load_poses(args.ground_truth)
     with args.keyframes.open(newline="") as stream:
         keyframes = list(csv.DictReader(stream))
-    keyframe_frames = sorted({int(row["frame_id"]) for row in keyframes})
+    timestamps = None
+    if args.times:
+        timestamps = [
+            float(line) for line in args.times.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    def source_frame(dataset_time: str | float, fallback: str | int) -> int:
+        if not timestamps:
+            return int(fallback)
+        value = float(dataset_time)
+        index = bisect.bisect_left(timestamps, value)
+        choices = [candidate for candidate in (index - 1, index)
+                   if 0 <= candidate < len(timestamps)]
+        return min(choices, key=lambda candidate: abs(timestamps[candidate] - value))
+
+    keyframe_sources = {
+        int(row["keyframe_id"]): source_frame(row["dataset_time"], row["frame_id"])
+        for row in keyframes
+    }
+    keyframe_frames = sorted(set(keyframe_sources.values()))
 
     events = []
     with args.events.open(newline="") as stream:
@@ -85,11 +110,26 @@ def main() -> None:
         details = event["parsed"]
         if event["event"] == "RETRIEVAL_CANDIDATE":
             source = details.get("source", "unknown")
-            query = int(details.get("query_frame", event["frame_id"]))
+            query = source_frame(
+                event.get("dataset_time", ""),
+                details.get("query_frame", event["frame_id"]),
+            )
+            candidate_kf = details.get("candidate_kf")
+            if candidate_kf is not None and int(candidate_kf) in keyframe_sources:
+                details["candidate_source_frame"] = str(
+                    keyframe_sources[int(candidate_kf)]
+                )
+            else:
+                details["candidate_source_frame"] = details.get(
+                    "candidate_frame", "-1"
+                )
             candidates[(source, query)].append(details)
         elif event["event"] == "RETRIEVAL_EMPTY":
             source = details.get("source", "unknown")
-            query = int(details.get("query_frame", event["frame_id"]))
+            query = source_frame(
+                event.get("dataset_time", ""),
+                details.get("query_frame", event["frame_id"]),
+            )
             candidates.setdefault((source, query), [])
         elif event["event"] == "RETRIEVAL_GEOMETRIC_RESULT":
             geometry.append(details)
@@ -127,7 +167,10 @@ def main() -> None:
             has_available_loop = any(is_positive(query, frame) for frame in prior)
             ranked = sorted(candidates[(source, query)],
                             key=lambda item: int(item.get("rank", 10**9)))
-            labels = [is_positive(query, int(item["candidate_frame"])) for item in ranked]
+            labels = [
+                is_positive(query, int(item["candidate_source_frame"]))
+                for item in ranked
+            ]
             labelled[query] = labels
             if has_available_loop:
                 eligible.append(query)

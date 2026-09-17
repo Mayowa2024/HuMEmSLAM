@@ -58,7 +58,7 @@ def main():
         "models": {},
         "coco_exclusion": (
             "The COCO checkpoint is not scored against these labels because its 80-class "
-            "IDs and meanings do not match the 21-class Mapillary HumanSLAM schema."
+            "IDs and meanings do not match the 21-class Mapillary HuMemSLAM schema."
         ),
     }
     for name, model_path in specifications.items():

@@ -83,13 +83,13 @@ def main():
         {
             "name": "MAPILLARY_FINETUNED_HUMANSLAM_PT",
             "path": root / "weights/humanSLAM_YOLO_seg.pt",
-            "training_domain": "Mapillary Vistas HumanSLAM 21-class subset",
+            "training_domain": "Mapillary Vistas HuMemSLAM 21-class subset",
             "runtime": "PyTorch",
         },
         {
             "name": "MAPILLARY_FINETUNED_HUMANSLAM_TENSORRT_FP16",
             "path": root / "weights/humanSLAM_YOLO_seg.engine",
-            "training_domain": "Mapillary Vistas HumanSLAM 21-class subset",
+            "training_domain": "Mapillary Vistas HuMemSLAM 21-class subset",
             "runtime": "TensorRT FP16",
         },
     ]

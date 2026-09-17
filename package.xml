@@ -2,7 +2,7 @@
 <package format="3">
   <name>slam</name>
   <version>0.0.0</version>
-  <description>HumanSLAM semantic retrieval, relocalisation and map-fusion assistance for ORB-SLAM3.</description>
+  <description>HuMemSLAM semantic retrieval, relocalisation and map-fusion assistance for ORB-SLAM3.</description>
   <maintainer email="samadebambo@gmail.com">Mayowa Adebambo</maintainer>
   <license>Apache-2.0</license>
 

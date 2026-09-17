@@ -1,0 +1,11 @@
+{
+  "name": "eigenplaces_r18_512",
+  "engine_path": "eigenplaces_r18_512.engine",
+  "onnx_path": "eigenplaces_r18_512.onnx",
+  "input_height": 320,
+  "input_width": 320,
+  "input_name": "images",
+  "output_name": "descriptor",
+  "normalization": "ImageNet mean/std; output L2 normalised",
+  "precision": "TensorRT FP16-eligible"
+}

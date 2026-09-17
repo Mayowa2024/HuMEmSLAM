@@ -39,7 +39,7 @@ def mine_existing_kitti(csv_path, pose_path, count, min_distance, min_frames):
             if distance < min_distance or abs(query - candidate) < min_frames:
                 continue
             candidates.append({
-                "source": "KITTI 06 old HumanSLAM proposal",
+                "source": "KITTI 06 old HuMemSLAM proposal",
                 "query_path": row["query_image_path"],
                 "candidate_path": row["candidate_image_path"],
                 "query_id": query,
@@ -202,7 +202,7 @@ def main():
     write_manifest(kitti, args.output / "kitti06_examples.csv")
     write_manifest(seasons, args.output / "4seasons_pose_labelled_examples.csv")
     render(kitti, args.output / "kitti06_hard_negatives.png",
-           "KITTI 06: high-scoring HumanSLAM proposals proven >20 m away")
+           "KITTI 06: high-scoring HuMemSLAM proposals proven >20 m away")
     render(seasons, args.output / "4seasons_pose_labelled_hard_negatives.png",
            "4Seasons neighbourhood 1: high MixVPR similarity but >20 m apart")
     print(f"Wrote hard-negative examples to {args.output}")

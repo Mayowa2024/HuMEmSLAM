@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare HumanSLAM and ORB on revisits under blur and darkness."""
+"""Compare HuMemSLAM and ORB on revisits under blur and darkness."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from run_night_orb_humanslam_microtests import semantic_record
 from run_night_revisit_microtests import (
     load_poses, orb_viewpoint_metrics, select_pairs,
 )
-from slam.human_slam_node import HumanSLAMNode
+from slam.human_slam_node import HuMemSLAMNode
 
 
 def arguments():
@@ -103,7 +103,7 @@ def main():
                   for kernel, angle in blur_conditions]
     examples = args.output / "examples"; examples.mkdir(exist_ok=True)
     rclpy.init(args=["--ros-args", "--params-file", str(args.params)])
-    node = HumanSLAMNode(); rows = []
+    node = HuMemSLAMNode(); rows = []
     try:
         for pair_index, (query_id, candidate_id, distance, rotation) in enumerate(pairs):
             candidate_image = cv2.imread(str(image_paths[candidate_id]))
@@ -181,10 +181,10 @@ def main():
                       and s["brightness_retained"] == brightness]
             left.plot([s["blur_kernel_px"] for s in subset],
                       [s["human_score_mean"] for s in subset], marker="o",
-                      label=f"HumanSLAM, {100*(1-brightness):.0f}% dark")
+                      label=f"HuMemSLAM, {100*(1-brightness):.0f}% dark")
         left.axhline(args.human_threshold, color="black", linestyle="--",
                      label="Human threshold")
-        left.set(xlabel="Motion-blur kernel (pixels)", ylabel="Mean HumanSLAM score",
+        left.set(xlabel="Motion-blur kernel (pixels)", ylabel="Mean HuMemSLAM score",
                  ylim=(0, 1)); left.grid(alpha=.2)
         right = left.twinx()
         zero_angle = [s for s in summary if s["blur_angle_deg"] == 0

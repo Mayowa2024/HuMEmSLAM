@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a stable-layout baseline or HumanSLAM diagnostic replay."""
+"""Render a stable-layout baseline or HuMemSLAM diagnostic replay."""
 
 import argparse
 import csv
@@ -114,11 +114,11 @@ def main():
                 copy_height = min(footer.shape[0], PANEL_HEIGHT - 34)
                 panel[34:34 + copy_height] = footer[:copy_height]
         else:
-            mode = "HumanSLAM: no semantic query on this frame" if semantic_root else "HumanSLAM: disabled"
+            mode = "HuMemSLAM: no semantic query on this frame" if semantic_root else "HuMemSLAM: disabled"
             put_line(panel, mode, 1, (180, 220, 255))
 
-        # Green circles are ORB keypoints with a valid tracked MapPoint—the
-        # feature observations contributing to camera localisation.
+
+
         for x, y in features.get(frame_id, []):
             cv2.circle(image, (int(round(x)), int(round(y))), 2,
                        (60, 255, 80), -1, cv2.LINE_AA)

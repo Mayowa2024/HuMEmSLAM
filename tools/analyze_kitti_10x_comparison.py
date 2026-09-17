@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate repeated KITTI ORB-SLAM3 versus HumanSLAM-only experiments."""
+"""Aggregate repeated KITTI ORB-SLAM3 versus HuMemSLAM-only experiments."""
 
 from __future__ import annotations
 
@@ -134,9 +134,9 @@ def analyse_run(run_dir: Path, gt: np.ndarray, condition: str) -> tuple[dict, np
         record["human_total_median_ms"] = float(np.median(human_total))
         record["human_total_p95_ms"] = float(np.percentile(human_total, 95))
         record["human_total_max_ms"] = float(np.max(human_total))
-        # A fresh HumanSLAM process is launched for every trial. Excluding only
-        # its first processed keyframe isolates normal steady-state operation
-        # while preserving every later OCR/object latency outlier.
+
+
+
         steady = human_total[1:]
         if len(steady):
             record["human_steady_mean_ms"] = float(np.mean(steady))
@@ -168,7 +168,7 @@ def main() -> None:
     gt = load_poses(args.ground_truth)
     conditions = {
         "ORB-SLAM3 baseline": args.experiment / "baseline",
-        "HumanSLAM only": args.experiment / "humanslam_only",
+        "HuMemSLAM only": args.experiment / "humanslam_only",
     }
 
     records: list[dict] = []
@@ -214,7 +214,7 @@ def main() -> None:
             for metric, metric_stats in values["metrics"].items():
                 writer.writerow([condition, metric, *[metric_stats[key] for key in ("n", "mean", "std", "median", "min", "max")]])
 
-    colors = {"ORB-SLAM3 baseline": "#1f77b4", "HumanSLAM only": "#2ca02c"}
+    colors = {"ORB-SLAM3 baseline": "#1f77b4", "HuMemSLAM only": "#2ca02c"}
     fig, ax = plt.subplots(figsize=(12, 6))
     frames = np.arange(len(gt))
     for condition in conditions:

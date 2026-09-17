@@ -3,7 +3,7 @@
 
 The ego vehicle drives the same closed route five times without teleportation.
 Weather changes only while stopped at the origin between laps.  Output follows
-the KITTI-like convention already used by HumanSLAM.
+the KITTI-like convention already used by HuMemSLAM.
 """
 
 import argparse
@@ -12,6 +12,7 @@ import json
 import math
 import queue
 import random
+import shutil
 import time
 from pathlib import Path
 
@@ -29,9 +30,16 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=2000)
-    parser.add_argument("--town", default="Town01")
+    parser.add_argument("--town", default="Town10HD_Opt")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--origin-spawn", type=int, default=0)
+    parser.add_argument(
+        "--route-anchor-spawns", default="",
+        help=("Comma-separated spawn indices. The origin is appended when needed. "
+              "Use this after visually selecting a compact, text-rich circuit."))
+    parser.add_argument(
+        "--route-radius-m", type=float, default=120.0,
+        help="Approximate radius used by the automatic compact-route selector.")
     parser.add_argument("--route-sampling-m", type=float, default=2.0)
     parser.add_argument("--target-speed-kmh", type=float, default=22.0)
     parser.add_argument("--arrival-radius-m", type=float, default=4.0)
@@ -45,6 +53,8 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--vehicle-filter", default="vehicle.tesla.model3")
     parser.add_argument("--max-lap-seconds", type=float, default=600.0)
+    parser.add_argument("--min-free-gb", type=float, default=15.0)
+    parser.add_argument("--disk-check-frames", type=int, default=100)
     return parser.parse_args()
 
 
@@ -73,19 +83,47 @@ def import_carla_api():
     return carla, GlobalRoutePlanner
 
 
-def choose_route_anchors(spawn_points, origin_index):
-    """Choose a reproducible triangular circuit and return to the origin."""
+def choose_route_anchors(spawn_points, origin_index, radius_m):
+    """Choose a reproducible compact triangular circuit and return to origin."""
     origin = spawn_points[origin_index]
     others = [(distance_2d(origin.location, point.location), i, point)
               for i, point in enumerate(spawn_points) if i != origin_index]
-    farthest = max(others)[2]
-    third = max(
-        (min(distance_2d(point.location, origin.location),
-             distance_2d(point.location, farthest.location)), i, point)
-        for i, point in enumerate(spawn_points)
-        if i != origin_index and point is not farthest
-    )[2]
-    return [origin, farthest, third, origin]
+    second = min(others, key=lambda item: abs(item[0] - radius_m))[2]
+    candidates = [
+        point for _, _, point in others
+        if point is not second and 0.45 * radius_m <=
+        distance_2d(origin.location, point.location) <= 1.35 * radius_m
+    ]
+    if not candidates:
+        candidates = [point for _, _, point in others if point is not second]
+    third = max(candidates, key=lambda point: distance_2d(
+        point.location, second.location))
+    return [origin, second, third, origin]
+
+
+def explicit_route_anchors(spawn_points, value, origin_index):
+    indices = [int(item.strip()) for item in value.split(",") if item.strip()]
+    if not indices:
+        return None
+    if indices[0] != origin_index:
+        indices.insert(0, origin_index)
+    if indices[-1] != origin_index:
+        indices.append(origin_index)
+    invalid = [index for index in indices if not 0 <= index < len(spawn_points)]
+    if invalid:
+        raise ValueError(f"Invalid route spawn indices: {invalid}")
+    return [spawn_points[index] for index in indices]
+
+
+def free_gb(path):
+    return shutil.disk_usage(path).free / (1024 ** 3)
+
+
+def require_disk_space(path, minimum_gb):
+    available = free_gb(path)
+    if available < minimum_gb:
+        raise RuntimeError(
+            f"Only {available:.1f} GiB free; at least {minimum_gb:.1f} GiB is required")
 
 
 def build_closed_route(carla_map, planner_class, anchors, sampling_resolution):
@@ -161,10 +199,16 @@ def image_array(image, np, cv2):
     return cv2.cvtColor(bgra, cv2.COLOR_BGRA2BGR)
 
 
+def write_image(path, array, cv2):
+    if not cv2.imwrite(str(path), array):
+        raise OSError(f"Failed to write image: {path}")
+
+
 def write_metadata(path, args, route, anchors):
     fx = args.width / (2.0 * math.tan(math.radians(args.fov) / 2.0))
     data = {
         "experiment": "repeated_closed_route_weather_cycle",
+        "dataset_status": "RECORDING",
         "continuous_recording": True,
         "weather_order": list(WEATHER_NAMES),
         "route_waypoint_count": len(route),
@@ -202,6 +246,11 @@ def main():
     left_dir, right_dir = output / "image_0", output / "image_1"
     left_dir.mkdir(parents=True, exist_ok=True)
     right_dir.mkdir(parents=True, exist_ok=True)
+    if any(left_dir.iterdir()) or any(right_dir.iterdir()):
+        raise RuntimeError(f"Refusing to record into non-empty dataset: {output}")
+    require_disk_space(output, args.min_free_gb)
+    (output / "RECORDING_IN_PROGRESS").write_text(
+        "Dataset is incomplete while this file exists.\n")
 
     client = carla.Client(args.host, args.port)
     client.set_timeout(20.0)
@@ -220,7 +269,11 @@ def main():
         spawn_points = world.get_map().get_spawn_points()
         if not 0 <= args.origin_spawn < len(spawn_points):
             raise ValueError(f"origin spawn must be in 0..{len(spawn_points)-1}")
-        anchors = choose_route_anchors(spawn_points, args.origin_spawn)
+        anchors = explicit_route_anchors(
+            spawn_points, args.route_anchor_spawns, args.origin_spawn)
+        if anchors is None:
+            anchors = choose_route_anchors(
+                spawn_points, args.origin_spawn, args.route_radius_m)
         route = build_closed_route(
             world.get_map(), planner_class, anchors, args.route_sampling_m)
         write_metadata(output / "metadata.json", args, route, anchors)
@@ -252,10 +305,10 @@ def main():
         image_index = 0
         start_elapsed = None
 
-        with (output / "times.txt").open("w") as times_file, \
-             (output / "pose_gt.csv").open("w", newline="") as pose_file, \
-             (output / "imu.csv").open("w", newline="") as imu_file, \
-             (output / "frame_metadata.csv").open("w", newline="") as frame_file, \
+        with (output / "times.txt").open("w") as times_file,\
+             (output / "pose_gt.csv").open("w", newline="") as pose_file,\
+             (output / "imu.csv").open("w", newline="") as imu_file,\
+             (output / "frame_metadata.csv").open("w", newline="") as frame_file,\
              (output / "lap_events.csv").open("w", newline="") as lap_file:
             pose_writer, imu_writer = csv.writer(pose_file), csv.writer(imu_file)
             frame_writer, lap_writer = csv.writer(frame_file), csv.writer(lap_file)
@@ -313,10 +366,10 @@ def main():
                         timestamp = left_image.timestamp
                         if start_elapsed is None:
                             start_elapsed = timestamp
-                        cv2.imwrite(str(left_dir / f"{image_index:06d}.png"),
-                                    image_array(left_image, np, cv2))
-                        cv2.imwrite(str(right_dir / f"{image_index:06d}.png"),
-                                    image_array(right_image, np, cv2))
+                        write_image(left_dir / f"{image_index:06d}.png",
+                                    image_array(left_image, np, cv2), cv2)
+                        write_image(right_dir / f"{image_index:06d}.png",
+                                    image_array(right_image, np, cv2), cv2)
                         transform = transforms_by_frame.pop(
                             frame, vehicle.get_transform())
                         loc, rot = transform.location, transform.rotation
@@ -328,6 +381,11 @@ def main():
                         frame_writer.writerow([image_index, frame, timestamp,
                                                lap_id, weather_name])
                         image_index += 1
+                        if image_index % args.disk_check_frames == 0:
+                            for stream in (times_file, pose_file, imu_file,
+                                           frame_file, lap_file):
+                                stream.flush()
+                            require_disk_space(output, args.min_free_gb)
                     if arrived:
                         vehicle.apply_control(carla.VehicleControl(brake=1.0))
                         finished = speed_mps(vehicle) < 0.15
@@ -337,6 +395,14 @@ def main():
                 print(f"Completed lap {lap_id + 1}/{len(WEATHER_NAMES)}: "
                       f"{weather_name}; recorded frames={image_index}", flush=True)
 
+        metadata_path = output / "metadata.json"
+        metadata = json.loads(metadata_path.read_text())
+        metadata["dataset_status"] = "COMPLETE"
+        metadata["stereo_pair_count"] = image_index
+        metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+        (output / "RECORDING_IN_PROGRESS").unlink()
+        (output / "DATASET_COMPLETE").write_text(
+            f"stereo_pairs={image_index}\n")
         print(f"Dataset complete: {output} ({image_index} stereo pairs)")
     finally:
         for actor in reversed(actors):

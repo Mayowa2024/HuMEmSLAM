@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Render HumanSLAM query/candidate retrievals as an inspection video."""
+"""Render HuMemSLAM query/candidate retrievals as an inspection video."""
 
 import argparse
 import csv
+import re
 from collections import OrderedDict
 from pathlib import Path
 
@@ -20,7 +21,11 @@ def arguments():
     parser.add_argument("--images", type=Path,
                         help="Dataset image directory; frame IDs index its sorted files")
     parser.add_argument("--semantic-frames", type=Path,
-                        help="HumanSLAM debug frames containing object annotations")
+                        help="HuMemSLAM debug frames containing object annotations")
+    parser.add_argument(
+        "--frame-association", type=Path,
+        help="trajectory_frame_ids.csv mapping internal to dataset frame IDs",
+    )
     parser.add_argument("--fps", type=float, default=2.0)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--query-ids", type=int, nargs="*",
@@ -50,6 +55,16 @@ def image_panel(path, title, lines=()):
 
 def main():
     args = arguments()
+    frame_map = {}
+    if args.frame_association and args.frame_association.exists():
+        with args.frame_association.open(newline="") as stream:
+            for association in csv.DictReader(stream):
+                match = re.search(
+                    r"dataset_frame=(\d+)",
+                    association.get("source_frame_id", ""),
+                )
+                if match:
+                    frame_map[int(association["frame_id"])] = int(match.group(1))
     images = None
     if args.images:
         images = sorted(path for path in args.images.iterdir()
@@ -58,11 +73,12 @@ def main():
     def frame_path(row, candidate=False):
         key = "candidate_source_frame_id" if candidate else "query_frame_id"
         recorded = "candidate_image_path" if candidate else "query_image_path"
-        index = int(row[key])
+        internal_index = int(row[key])
         if args.semantic_frames:
-            annotated = args.semantic_frames / f"{index:06d}.png"
+            annotated = args.semantic_frames / f"{internal_index:06d}.png"
             if annotated.exists():
                 return annotated
+        index = frame_map.get(internal_index, internal_index)
         if images is not None and 0 <= index < len(images):
             return images[index]
         return row[recorded]
@@ -85,7 +101,11 @@ def main():
     for query_id, rows in grouped.items():
         rows.sort(key=lambda row: int(row["rank"]))
         shown = rows[:args.top_k]
-        query = image_panel(frame_path(shown[0]), f"QUERY frame {query_id}")
+        query_dataset_id = frame_map.get(int(query_id), int(query_id))
+        query = image_panel(
+            frame_path(shown[0]),
+            f"QUERY dataset frame {query_dataset_id} (internal {query_id})",
+        )
         panels = [query]
         for row in shown:
             score = float(
@@ -98,9 +118,14 @@ def main():
                 f"score={score:.3f}  scene={row.get('scene_score', '')}",
                 f"object={row.get('object_score', '')}  text={row.get('text_score', '')}",
             )
+            candidate_internal_id = int(row["candidate_source_frame_id"])
+            candidate_dataset_id = frame_map.get(
+                candidate_internal_id, candidate_internal_id
+            )
             panels.append(image_panel(
                 frame_path(row, candidate=True),
-                f"RANK {row['rank']}  candidate frame {row['candidate_source_frame_id']}",
+                f"RANK {row['rank']}  dataset frame {candidate_dataset_id} "
+                f"(internal {candidate_internal_id})",
                 parts,
             ))
         while len(panels) < 6:

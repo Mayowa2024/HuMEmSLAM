@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one image through HumanSLAM twice and report its self-match score."""
+"""Run one image through HuMemSLAM twice and report its self-match score."""
 
 import argparse
 import json
@@ -9,7 +9,7 @@ from pathlib import Path
 import cv2
 import rclpy
 
-from slam.human_slam_node import HumanSLAMNode
+from slam.human_slam_node import HuMemSLAMNode
 from slam.types import KeyframeRecord
 
 
@@ -40,7 +40,7 @@ def main():
             raise SystemExit(f"Cannot read {path}")
 
     rclpy.init(args=["--ros-args", "--params-file", str(args.params)])
-    node = HumanSLAMNode()
+    node = HuMemSLAMNode()
     try:
         records = []
         inference_ms = []
@@ -77,7 +77,7 @@ def main():
             },
             "score": result,
         }
-        # TextAnchor values need an explicit JSON fallback.
+
         encoded = json.dumps(report, indent=2, default=lambda value: vars(value))
         print(encoded)
         if args.output:

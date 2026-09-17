@@ -3,126 +3,118 @@
 from typing import Dict, Mapping
 
 
-# Official Places365 class indices. Unlisted classes deliberately map to
-# ``other``: HumanSLAM should not invent fine-grained context for irrelevant
-# rooms or ambiguous scenes.
+
+
+
 PLACES365_GROUP_BY_ID = {
-    # Urban roads and public space.
-    4: "urban_road",       # alley
-    79: "urban_road",      # canal/urban
-    112: "urban_road",     # crosswalk
-    125: "urban_road",     # downtown
-    270: "urban_road",     # plaza
-    273: "urban_road",     # promenade
-    301: "urban_road",     # shopfront
-    307: "urban_road",     # skyscraper
-    308: "urban_road",     # slum
-    319: "urban_road",     # street
+    4: "urban_road",
+    79: "urban_road",
+    112: "urban_road",
+    125: "urban_road",
+    270: "urban_road",
+    273: "urban_road",
+    301: "urban_road",
+    307: "urban_road",
+    308: "urban_road",
+    319: "urban_road",
 
-    # Residential context.
-    8: "residential",      # apartment_building/outdoor
-    49: "residential",     # beach_house
-    74: "residential",     # cabin/outdoor
-    87: "residential",     # chalet
-    107: "residential",    # cottage
-    127: "residential",    # driveway
-    183: "residential",    # house
-    184: "residential",    # hunting_lodge/outdoor
-    193: "residential",    # inn/outdoor
-    220: "residential",    # mansion
-    221: "residential",    # manufactured_home
-    231: "residential",    # motel
-    283: "residential",    # residential_neighborhood
-    296: "residential",    # schoolhouse
+    8: "residential",
+    49: "residential",
+    74: "residential",
+    87: "residential",
+    107: "residential",
+    127: "residential",
+    183: "residential",
+    184: "residential",
+    193: "residential",
+    220: "residential",
+    221: "residential",
+    231: "residential",
+    283: "residential",
+    296: "residential",
 
-    # Commercial roadside context.
-    31: "commercial",      # bakery/shop
-    47: "commercial",      # bazaar/outdoor
-    50: "commercial",      # beauty_salon
-    72: "commercial",      # butchers_shop
-    99: "commercial",      # coffee_shop
-    114: "commercial",     # delicatessen
-    119: "commercial",     # diner/outdoor
-    128: "commercial",     # drugstore
-    139: "commercial",     # fastfood_restaurant
-    147: "commercial",     # florist_shop/indoor
-    158: "commercial",     # gas_station
-    161: "commercial",     # general_store/outdoor
-    162: "commercial",     # gift_shop
-    172: "commercial",     # hardware_store
-    181: "commercial",     # hotel/outdoor
-    198: "commercial",     # jewelry_shop
-    223: "commercial",     # market/outdoor
-    261: "commercial",     # pet_shop
-    262: "commercial",     # pharmacy
-    267: "commercial",     # pizzeria
-    284: "commercial",     # restaurant
-    286: "commercial",     # restaurant_patio
-    300: "commercial",     # shoe_shop
-    302: "commercial",     # shopping_mall/indoor
-    321: "commercial",     # supermarket
-    335: "commercial",     # toyshop
+    31: "commercial",
+    47: "commercial",
+    50: "commercial",
+    72: "commercial",
+    99: "commercial",
+    114: "commercial",
+    119: "commercial",
+    128: "commercial",
+    139: "commercial",
+    147: "commercial",
+    158: "commercial",
+    161: "commercial",
+    162: "commercial",
+    172: "commercial",
+    181: "commercial",
+    198: "commercial",
+    223: "commercial",
+    261: "commercial",
+    262: "commercial",
+    267: "commercial",
+    284: "commercial",
+    286: "commercial",
+    300: "commercial",
+    302: "commercial",
+    321: "commercial",
+    335: "commercial",
 
-    # Parking and vehicle storage.
-    156: "parking",        # garage/indoor
-    157: "parking",        # garage/outdoor
-    255: "parking",        # parking_garage/indoor
-    256: "parking",        # parking_garage/outdoor
-    257: "parking",        # parking_lot
+    156: "parking",
+    157: "parking",
+    255: "parking",
+    256: "parking",
+    257: "parking",
 
-    # Major transport infrastructure.
-    0: "major_transport",  # airfield
-    2: "major_transport",  # airport_terminal
-    66: "major_transport", # bridge
-    67: "urban_road",      # building_facade
-    71: "major_transport", # bus_station/indoor
-    129: "major_transport",# elevator/door (station-like ambiguity)
-    171: "major_transport",# harbor
-    174: "major_transport",# heliport
-    175: "major_transport",# highway
-    207: "major_transport",# landing_deck
-    216: "major_transport",# loading_dock
-    266: "major_transport",# pier
-    278: "major_transport",# railroad_track
-    293: "major_transport",# runway
-    320: "major_transport",# subway_station/platform
-    336: "major_transport",# train_interior
-    337: "major_transport",# train_station/platform
-    347: "major_transport",# viaduct
+    0: "major_transport",
+    2: "major_transport",
+    66: "major_transport",
+    67: "urban_road",
+    71: "major_transport",
+    129: "major_transport",
+    171: "major_transport",
+    174: "major_transport",
+    175: "major_transport",
+    207: "major_transport",
+    216: "major_transport",
+    266: "major_transport",
+    278: "major_transport",
+    293: "major_transport",
+    320: "major_transport",
+    336: "major_transport",
+    337: "major_transport",
+    347: "major_transport",
 
-    # Industrial/built operational areas.
-    18: "industrial",      # army_base
-    23: "industrial",      # assembly_line
-    28: "industrial",      # auto_factory
-    103: "industrial",     # construction_site
-    133: "industrial",     # engine_room
-    136: "industrial",     # excavation
-    144: "industrial",     # fire_station
-    169: "industrial",     # hangar/indoor
-    170: "industrial",     # hangar/outdoor
-    192: "industrial",     # industrial_area
-    199: "industrial",     # junkyard
-    206: "industrial",     # landfill
-    247: "industrial",     # oilrig
-    282: "industrial",     # repair_shop
-    298: "industrial",     # server_room
+    18: "industrial",
+    23: "industrial",
+    28: "industrial",
+    103: "industrial",
+    133: "industrial",
+    136: "industrial",
+    144: "industrial",
+    169: "industrial",
+    170: "industrial",
+    192: "industrial",
+    199: "industrial",
+    206: "industrial",
+    247: "industrial",
+    282: "industrial",
+    298: "industrial",
 
-    # Rural roads and settled countryside.
-    118: "rural_road",     # desert_road
-    138: "rural_road",     # farm
-    142: "rural_road",     # field_road
-    152: "rural_road",     # forest_road
-    173: "rural_road",     # hayfield
-    249: "rural_road",     # orchard
-    258: "rural_road",     # pasture
-    287: "rural_road",     # rice_paddy
-    338: "rural_road",     # tree_farm
-    348: "rural_road",     # village
-    349: "rural_road",     # vineyard
-    359: "rural_road",     # wheat_field
-    360: "rural_road",     # wind_farm
+    118: "rural_road",
+    138: "rural_road",
+    142: "rural_road",
+    152: "rural_road",
+    173: "rural_road",
+    249: "rural_road",
+    258: "rural_road",
+    287: "rural_road",
+    338: "rural_road",
+    348: "rural_road",
+    349: "rural_road",
+    359: "rural_road",
+    360: "rural_road",
 
-    # Natural/open environments.
     30: "natural", 36: "natural", 48: "natural", 62: "natural",
     73: "natural", 76: "natural", 78: "natural", 81: "natural",
     94: "natural", 97: "natural", 104: "natural", 110: "natural",
@@ -138,7 +130,6 @@ PLACES365_GROUP_BY_ID = {
     324: "natural", 341: "natural", 342: "natural", 344: "natural",
     350: "natural", 355: "natural", 356: "natural", 357: "natural",
 
-    # Distinctive restricted/special-purpose sites.
     5: "restricted_special", 15: "restricted_special",
     16: "restricted_special", 17: "restricted_special",
     24: "restricted_special", 42: "restricted_special",

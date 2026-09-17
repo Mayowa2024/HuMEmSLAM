@@ -298,9 +298,9 @@ def convert_split(args, split, preview_budget):
         writer.writerows(image_rows)
     (args.output / f"{short_name}.txt").write_text(
         "".join(
-            # Keep the dataset-facing path rather than resolving the images/<split>
-            # symlink into the original Mapillary tree. Ultralytics derives the
-            # annotation path by replacing /images/ with /labels/.
+
+
+
             f"{args.output / 'images' / short_name / (row['stem'] + image_for_stem(image_dir, row['stem']).suffix)}\n"
             for row in image_rows
         ),

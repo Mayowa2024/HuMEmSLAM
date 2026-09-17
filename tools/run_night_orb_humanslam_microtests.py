@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Paired HumanSLAM and ORB/FAST self-match tests under synthetic night."""
+"""Paired HuMemSLAM and ORB/FAST self-match tests under synthetic night."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rclpy
 
-from slam.human_slam_node import HumanSLAMNode
+from slam.human_slam_node import HuMemSLAMNode
 from slam.scene_categories import category_compatibility
 from slam.types import KeyframeRecord
 
@@ -68,7 +68,7 @@ def make_night(image, profile, seed):
     yy, xx = np.mgrid[-1:1:complex(height), -1:1:complex(width)]
     radius = np.clip((xx * xx + yy * yy) / 2.0, 0, 1)
     linear *= (1.0 - profile["vignette"] * radius)[..., None]
-    # Cool ambient light, with independent sensor noise but unchanged geometry.
+
     linear *= np.asarray([1.08, 1.00, 0.88], dtype=np.float32)
     image_night = linear_to_srgb(linear).astype(np.float32)
     signal_sigma = np.sqrt(np.maximum(image_night, 0.0)) * profile["noise"] * 0.18
@@ -128,7 +128,7 @@ def orb_metrics(candidate, query, min_inliers):
         "candidate_orb_keypoints": len(candidate_kp),
         "query_orb_keypoints": len(query_kp), "ratio_matches": len(good),
         "ransac_inliers": inliers, "ransac_inlier_ratio": inlier_ratio,
-        # Diagnostic screening boundary, not ORB-SLAM3's full Sim3 acceptance.
+
         "orb_diagnostic_pass": inliers >= min_inliers and inlier_ratio >= 0.25,
     }
 
@@ -141,7 +141,7 @@ def main():
     examples = args.output / "examples"
     examples.mkdir(exist_ok=True)
     rclpy.init(args=["--ros-args", "--params-file", str(args.params)])
-    node = HumanSLAMNode()
+    node = HuMemSLAMNode()
     rows = []
     try:
         for run, frame_id in enumerate(args.frame_ids, 1):
@@ -215,10 +215,10 @@ def main():
         x = np.arange(len(summary))
         fig, left = plt.subplots(figsize=(10, 5.8))
         left.plot(x, [r["human_score_mean"] for r in summary], marker="o",
-                  linewidth=2, label="HumanSLAM score")
+                  linewidth=2, label="HuMemSLAM score")
         left.axhline(args.human_threshold, color="tab:blue", linestyle="--",
-                     alpha=.7, label="HumanSLAM threshold")
-        left.set_ylabel("HumanSLAM score")
+                     alpha=.7, label="HuMemSLAM threshold")
+        left.set_ylabel("HuMemSLAM score")
         left.set_ylim(0, 1.02)
         right = left.twinx()
         right.plot(x, [r["orb_inliers_mean"] for r in summary], marker="s",

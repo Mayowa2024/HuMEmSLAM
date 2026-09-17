@@ -14,8 +14,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-MODES = ("ORB-SLAM3 baseline", "HumanSLAM only")
-COLORS = {"ORB-SLAM3 baseline": "#1f77b4", "HumanSLAM only": "#2ca02c"}
+MODES = ("ORB-SLAM3 baseline", "HuMemSLAM only")
+COLORS = {"ORB-SLAM3 baseline": "#1f77b4", "HuMemSLAM only": "#2ca02c"}
 
 
 def main() -> None:
@@ -116,12 +116,12 @@ def main() -> None:
     fig.savefig(output / "loop_closure_frame_vs_darkness.png", dpi=180)
     plt.close(fig)
 
-    human = mode_rows("HumanSLAM only")
+    human = mode_rows("HuMemSLAM only")
     fig, ax = plt.subplots(figsize=(9, 5.5))
     ax.plot([row["darkening_percent"] for row in human],
             [row["human_steady_mean_ms_mean"] for row in human],
-            marker="o", linewidth=2, color=COLORS["HumanSLAM only"])
-    ax.set(title="HumanSLAM steady-state latency under revisit darkening",
+            marker="o", linewidth=2, color=COLORS["HuMemSLAM only"])
+    ax.set(title="HuMemSLAM steady-state latency under revisit darkening",
            xlabel="Darkening from frame 828 (%)",
            ylabel="Mean semantic inference latency (ms)")
     ax.grid(alpha=.25)

@@ -14,8 +14,8 @@ def frames_for_trajectory(run):
 def gt_positions(path):
     out={}
     for r in csv.DictReader(open(path)):
-        # CARLA is left-handed (x forward, y right, z up). Convert to a
-        # right-handed optical-style basis before rigid alignment.
+
+
         out[int(r['image_index'])]=np.array([float(r['y']),-float(r['z']),float(r['x'])])
     return out
 def rigid(src,dst):
@@ -26,7 +26,7 @@ def ma(x,n=25):
     p=np.pad(x,(n//2,n-1-n//2),mode='edge'); return np.convolve(p,np.ones(n)/n,'valid')
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,required=True); ap.add_argument('--gt',type=Path,required=True); a=ap.parse_args()
-    specs={'orbslam3_baseline_final':('ORB-SLAM3','#d62728'),'humanslam_final':('HumanSLAM','#9467bd')}; gtmap=gt_positions(a.gt)
+    specs={'orbslam3_baseline_final':('ORB-SLAM3','#d62728'),'humanslam_final':('HuMemSLAM','#9467bd')}; gtmap=gt_positions(a.gt)
     plots=a.root/'plots'; metrics=a.root/'metrics'; plots.mkdir(exist_ok=True); metrics.mkdir(exist_ok=True)
     data={}; summary={}
     for key,(label,color) in specs.items():
@@ -39,8 +39,8 @@ def main():
         data[key]=(ids,gt,aligned,err,ape,label,color)
         summary[key]={'processed_tracks':len(rows),'trajectory_poses_evaluated':len(ids),'states':states,'map_count':len(maps),'map_ids':sorted(maps),'prefix_aligned_error_rmse_m':float(np.sqrt(np.mean(err**2))),'ape_se3_rmse_m':float(np.sqrt(np.mean(ape**2)))}
     json.dump(summary,open(metrics/'summary.json','w'),indent=2)
-    # Position-only KITTI matrix file for the annotated replay trajectory panel.
-    # Evaluation above uses the CSV directly; this file is only a visual aid.
+
+
     all_gt=[]; first=gtmap[min(gtmap)]
     for frame in range(max(gtmap)+1):
         p=gtmap.get(frame,first); T=np.eye(4); T[:3,3]=p; all_gt.append(T[:3,:4].reshape(-1))

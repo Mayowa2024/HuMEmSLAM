@@ -40,13 +40,13 @@ def expose_embedding(source_path, output_path):
 def build_engine(onnx_path, engine_path, fp16=True):
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
-    # TensorRT 10/11 networks are explicitly batched by default.
+
     network = builder.create_network(0)
     parser = trt.OnnxParser(network, logger)
     config = builder.create_builder_config()
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)
-    # TensorRT 11 removed BuilderFlag.FP16 and selects precision through its
-    # strongly typed network/tactics. Older exports remain valid as FP32.
+
+
     if fp16 and hasattr(trt.BuilderFlag, "FP16"):
         config.set_flag(trt.BuilderFlag.FP16)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible YOLO26 segmentation fine-tuning for HumanSLAM."""
+"""Reproducible YOLO26 segmentation fine-tuning for HuMemSLAM."""
 
 import argparse
 import json
@@ -48,7 +48,7 @@ def main():
     if str(args.device) != "cpu":
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA was requested but PyTorch cannot access it")
-        torch.zeros(1, device="cuda")  # fail before creating a misleading run
+        torch.zeros(1, device="cuda")
 
     run_dir = args.project.resolve() / args.name
     run_dir.mkdir(parents=True, exist_ok=True)

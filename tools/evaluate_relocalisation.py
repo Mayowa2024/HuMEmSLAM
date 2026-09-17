@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Evaluate tracking-loss and relocalisation episodes for either SLAM mode.
 
-The same evaluator is used for native ORB-SLAM3 and HumanSLAM runs. A tracking
+The same evaluator is used for native ORB-SLAM3 and HuMemSLAM runs. A tracking
 recovery is not automatically called a correct relocalisation: when a
 structured RELOCALIZATION_SUCCESS supplies its matched keyframe, the query and
 candidate are independently labelled using dataset ground-truth poses.

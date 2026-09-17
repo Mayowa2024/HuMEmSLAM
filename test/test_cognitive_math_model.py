@@ -165,8 +165,8 @@ def test_candidate_missing_query_supported_text_keeps_query_weight():
         query, candidate, [query_scene], [candidate_scene]
     )
 
-    # Scene and object are perfect, but distinctive query text is absent from
-    # the candidate: (0.3 + 0.3 + 0.4*0) / 1.0.
+
+
     assert np.isclose(score, 0.6)
 
 
@@ -198,6 +198,29 @@ def test_query_without_objects_disables_object_layer_for_all_candidates():
 
     assert result["object_score"] is None
     assert np.isclose(result["unified_score"], 1.0)
+
+
+def test_object_appearance_embedding_separates_same_geometry_objects():
+    model = CognitiveMathModel(
+        use_scene=False, use_text=False, object_appearance_weight=0.5
+    )
+    query_object = landmark()
+    matching_object = landmark()
+    different_object = landmark()
+    query_object.appearance_embedding = np.asarray([1.0, 0.0])
+    matching_object.appearance_embedding = np.asarray([1.0, 0.0])
+    different_object.appearance_embedding = np.asarray([-1.0, 0.0])
+    query = keyframe(1, scene([1.0]), [query_object])
+
+    matching_score = model.object_similarity(
+        query, keyframe(2, scene([1.0]), [matching_object])
+    )
+    different_score = model.object_similarity(
+        query, keyframe(3, scene([1.0]), [different_object])
+    )
+
+    assert np.isclose(matching_score, 1.0)
+    assert np.isclose(different_score, 0.5)
 
 
 def test_garbage_query_ocr_does_not_activate_text_denominator():
@@ -313,9 +336,62 @@ def test_object_assignment_is_one_to_one_within_exact_class():
         landmark(name="traffic_sign", x=0.2),
     ])
 
-    # The single candidate sign can satisfy only one of two query signs;
-    # the unmatched query sign contributes zero.
+
+
     assert np.isclose(model.object_similarity(query, candidate), 0.5)
+
+
+def test_generic_object_classes_have_less_influence():
+    model = CognitiveMathModel(object_class_weights={"pole": 0.25, "traffic_sign": 1.0})
+    query = keyframe(1, scene([1.0]), [
+        landmark(name="pole", x=0.2),
+        landmark(name="traffic_sign", x=0.8),
+    ])
+    candidate = keyframe(2, scene([1.0]), [
+        landmark(name="pole", x=0.2),
+    ])
+
+    assert np.isclose(model.object_similarity(query, candidate), 0.2)
+
+
+def test_relative_layout_penalises_reversed_object_arrangement():
+    model = CognitiveMathModel(
+        relative_layout_weight=0.25, relative_layout_sigma=0.1
+    )
+    query = keyframe(1, scene([1.0]), [
+        landmark(name="building", x=0.2),
+        landmark(name="traffic_sign", x=0.8),
+    ])
+    aligned = keyframe(2, scene([1.0]), [
+        landmark(name="building", x=0.2),
+        landmark(name="traffic_sign", x=0.8),
+    ])
+    reversed_layout = keyframe(3, scene([1.0]), [
+        landmark(name="building", x=0.8),
+        landmark(name="traffic_sign", x=0.2),
+    ])
+
+    assert model.object_similarity(query, aligned) > model.object_similarity(
+        query, reversed_layout
+    )
+
+
+def test_repeated_local_observation_increases_evidence_reliability():
+    model = CognitiveMathModel(persistence_gain=0.25)
+    query_object = landmark()
+    candidate_object = landmark()
+    query_object.seg_conf = 0.6
+    candidate_object.seg_conf = 0.6
+    repeated_query = landmark()
+    repeated_candidate = landmark()
+    repeated_query.seg_conf = 0.6
+    repeated_candidate.seg_conf = 0.6
+    repeated_query.observation_count = 3
+    repeated_candidate.observation_count = 3
+
+    assert model.object_match_score(
+        repeated_query, repeated_candidate
+    ) > model.object_match_score(query_object, candidate_object)
 
 
 def test_text_requires_geometrically_consistent_supporting_object():
@@ -371,3 +447,17 @@ def test_no_available_evidence_returns_zero():
     score_value = model.unified_score(query, candidate, [], [])
 
     assert score_value == 0.0
+
+
+def test_scene_support_mode_does_not_penalise_missing_support():
+    model = CognitiveMathModel(fusion_mode="scene_support")
+    query_scene = scene([1.0, 0.0])
+    candidate_scene = scene([0.8, 0.6])
+    query = keyframe(1, query_scene)
+    candidate = keyframe(2, candidate_scene)
+
+    breakdown = model.score_breakdown(
+        query, candidate, [query_scene], [candidate_scene]
+    )
+
+    assert np.isclose(breakdown["unified_score"], breakdown["scene_score"])

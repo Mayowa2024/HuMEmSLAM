@@ -1,9 +1,7 @@
-# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# ROS/colcon generated output
 build/
 install/
 log/
@@ -15,7 +13,17 @@ runs/
 dissertation/build/
 validation_results/
 
-# LaTeX generated output (keep .tex, bibliography and figure sources)
+teleopbike_experiments/
+
+presentation_assets/
+paper_export/
+dissertation/
+
+docs/*
+todo-add_to_report.txt
+limitations.txt
+model.markdown.out
+
 dissertation/*.aux
 dissertation/*.bbl
 dissertation/*.bcf
@@ -30,21 +38,30 @@ dissertation/*.toc
 dissertation/*.xdv
 dissertation/chapters/*.aux
 
-# Local IDE/tool state
 .agents/
 .codex/
 .vscode/
 .idea/
 
-# Local links to separately managed ORB-SLAM3 repositories
 external/
 
-# Private author notes and generated dissertation binary
 docs/DEFENCE_MANUAL_PRIVATE.md
 docs/METHODOLOGY.docx
 tools/generate_methodology_docx.py
+tools/add_campus_condition_labels.py
+tools/build_campus_supplementary_video.py
+tools/build_campus_validation_clips.py
+tools/build_math_model_pdf.py
+tools/generate_carla_appearance_variation_assets.py
+tools/generate_humemslam_carla_robustness.py
+tools/generate_kitti_vpr_presentation_assets.py
+tools/repair_kitti06_campaign.py
 
-# Hardware/runtime-specific model artefacts
+tools/*.png
+tools/*.jpg
+tools/*.jpeg
+tools/*.mp4
+
 weights/*.engine
 weights/*.engine.json
 weights/*.onnx
@@ -53,4 +70,5 @@ weights/**/*.engine
 weights/**/*.onnx
 weights/**/*.pt
 weights/**/*.ckpt
+weights/**/*.profile
 yolo*.pt

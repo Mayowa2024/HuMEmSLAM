@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run reproducible ORB-SLAM3/HumanSLAM offline experiments and evaluate them."""
+"""Run reproducible ORB-SLAM3/HuMemSLAM offline experiments and evaluate them."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ DEFAULT_CONFIG = Path("/home/teleopbike/Documents/Mayowa/ros2_ws/src/slam/config
 
 def arguments():
     parser = argparse.ArgumentParser(
-        description="Run baseline, HumanSLAM, or a matched pair and create metrics automatically."
+        description="Run baseline, HuMemSLAM, or a matched pair and create metrics automatically."
     )
     parser.add_argument("--dataset", required=True, type=Path)
     parser.add_argument("--settings", required=True, type=Path)
@@ -45,6 +45,10 @@ def arguments():
     parser.add_argument("--end-frame", type=int, default=-1)
     parser.add_argument("--semantic-threshold", type=float, default=0.70)
     parser.add_argument("--candidate-count", type=int, default=5)
+    parser.add_argument(
+        "--ocr-text-det-limit-side-len", type=int, default=640,
+        help="Override PaddleOCR detector maximum input side for this run.",
+    )
     parser.add_argument("--use-scene", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--use-object", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--use-text", action=argparse.BooleanOptionalAction, default=True)
@@ -52,6 +56,10 @@ def arguments():
     parser.add_argument("--rotation-threshold-deg", type=float, default=30.0)
     parser.add_argument("--min-frame-separation", type=int, default=100)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--save-semantic-frames", action="store_true",
+        help="Save per-frame HuMemSLAM debug images (large; disabled by default).",
+    )
     return parser.parse_args()
 
 
@@ -137,6 +145,7 @@ def evaluate(run_dir: Path, args, human: bool):
             "--events", str(run_dir / "orb_events.csv"),
             "--keyframes", str(run_dir / "orb_keyframes.csv"),
             "--ground-truth", str(args.ground_truth),
+            "--times", str(args.dataset / args.times_file),
             "--position-threshold-m", str(args.position_threshold_m),
             "--rotation-threshold-deg", str(args.rotation_threshold_deg),
             "--min-frame-separation", str(args.min_frame_separation),
@@ -199,6 +208,8 @@ def run_mode(args, human: bool):
         "start_frame": args.start_frame, "end_frame": args.end_frame,
         "playback_rate": args.playback_rate,
         "semantic_threshold": args.semantic_threshold,
+        "ocr_text_det_limit_side_len": args.ocr_text_det_limit_side_len,
+        "save_semantic_frames": args.save_semantic_frames,
         "layers": {"scene": args.use_scene, "object": args.use_object, "text": args.use_text},
         "git_commits": {
             "humanslam": git_commit(ROOT),
@@ -224,10 +235,11 @@ def run_mode(args, human: bool):
         f"start_frame:={args.start_frame}", f"end_frame:={args.end_frame}",
         f"semantic_threshold:={args.semantic_threshold}",
         f"candidate_response_count:={args.candidate_count}",
+        f"ocr_text_det_limit_side_len:={args.ocr_text_det_limit_side_len}",
         f"use_scene:={bool_text(args.use_scene)}", f"use_object:={bool_text(args.use_object)}",
         f"use_text:={bool_text(args.use_text)}",
     ]
-    if human:
+    if human and args.save_semantic_frames:
         command.append(f"debug_output_dir:={run_dir / 'semantic_frames'}")
     (run_dir / "command.txt").write_text(" ".join(command) + "\n", encoding="utf-8")
     code = run_logged(command, run_dir / "console.log", env=os.environ.copy())

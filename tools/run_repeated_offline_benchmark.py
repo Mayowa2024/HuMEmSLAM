@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run resumable repeated matched baseline/HumanSLAM offline benchmarks."""
+"""Run resumable repeated matched baseline/HuMemSLAM offline benchmarks."""
 
 from __future__ import annotations
 
@@ -19,6 +19,10 @@ def arguments():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--perturb-start", type=int, default=828)
+    parser.add_argument(
+        "--save-semantic-frames", action="store_true",
+        help="Save large per-frame semantic debug images for every HuMemSLAM run.",
+    )
     return parser.parse_args()
 
 
@@ -43,6 +47,7 @@ def main():
         "perturbation_start_frame": args.perturb_start,
         "semantic_threshold": 0.70,
         "geometry_profile": "unchanged",
+        "save_semantic_frames": args.save_semantic_frames,
     }
     write_json(args.output / "experiment_manifest.json", manifest)
     status = {"state": "running", "completed": [], "failed": []}
@@ -58,15 +63,23 @@ def main():
             status["completed"].append(number)
             write_json(args.output / "status.json", status)
             continue
+        if baseline_done:
+            mode = "humanslam"
+        elif human_done:
+            mode = "baseline"
+        else:
+            mode = "both"
         command = [
             sys.executable, str(benchmark),
             "--dataset", str(args.dataset),
             "--settings", str(args.settings),
             "--ground-truth", str(args.ground_truth),
-            "--mode", "both", "--output", str(run),
+            "--mode", mode, "--output", str(run),
         ]
         if run.exists() and any(run.iterdir()):
             command.append("--overwrite")
+        if args.save_semantic_frames:
+            command.append("--save-semantic-frames")
         print(f"START matched run {number:02d}/{args.runs}", flush=True)
         result = subprocess.run(command, check=False)
         if result.returncode == 0:

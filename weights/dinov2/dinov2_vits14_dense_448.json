@@ -1,0 +1,15 @@
+{
+  "name": "dinov2_vits14_dense",
+  "engine_path": "dinov2_vits14_dense_448.engine",
+  "onnx_path": "dinov2_vits14_dense_448.fp16.onnx",
+  "input_height": 448,
+  "input_width": 448,
+  "input_name": "images",
+  "output_name": "features",
+  "feature_shape": [
+    384,
+    32,
+    32
+  ],
+  "precision": "fp16"
+}

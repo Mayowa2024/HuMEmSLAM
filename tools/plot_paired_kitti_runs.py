@@ -104,21 +104,19 @@ def main():
             summary[name]["ape_median_m"] = float(np.median(error))
             summary[name]["ape_max_m"] = float(np.max(error))
 
-    # Valid HumanSLAM trajectory against ground truth.
     human = runs["humanslam"]
     fig, ax = plt.subplots(figsize=(8, 7))
     ids = human["frames"]
     ax.plot(gt_all[ids, 0, 3], gt_all[ids, 2, 3], "k", lw=2, label="Ground truth")
     ax.plot(human["aligned"][:, 0], human["aligned"][:, 2], color="#2ca02c",
-            lw=1.5, label="HumanSLAM")
+            lw=1.5, label="HuMemSLAM")
     ax.scatter(human["aligned"][ids == 916, 0], human["aligned"][ids == 916, 2],
                color="#d62728", s=45, zorder=4, label="Semantic closure (frame 916)")
-    ax.set(title="HumanSLAM trajectory — KITTI 06 blur 15 + dark 50",
+    ax.set(title="HuMemSLAM trajectory — KITTI 06 blur 15 + dark 50",
            xlabel="x (m)", ylabel="z (m)")
     ax.axis("equal"); ax.grid(alpha=.25); ax.legend(); fig.tight_layout()
     fig.savefig(output / "humanslam_trajectory.png", dpi=200); plt.close(fig)
 
-    # Valid HumanSLAM frame-wise translational APE.
     fig, ax = plt.subplots(figsize=(12, 5))
     ax.axvspan(args.perturb_start, 1100, color="#f0c36e", alpha=.22,
                label="Blur 15 + dark 50")
@@ -127,7 +125,7 @@ def main():
             label="25-frame mean")
     ax.axvline(916, color="#d62728", ls="--", lw=1.3,
                label="Semantic loop correction")
-    ax.set(title=f'HumanSLAM translation APE — RMSE {summary["humanslam"]["ape_rmse_m"]:.3f} m',
+    ax.set(title=f'HuMemSLAM translation APE — RMSE {summary["humanslam"]["ape_rmse_m"]:.3f} m',
            xlabel="KITTI dataset frame", ylabel="SE(3)-aligned translation error (m)")
     ax.grid(alpha=.25); ax.legend(); fig.tight_layout()
     fig.savefig(output / "humanslam_ape_vs_frame.png", dpi=200); plt.close(fig)
@@ -162,7 +160,7 @@ def main():
         ax.plot(base["aligned"][:, 0], base["aligned"][:, 2], color="#1f77b4",
                 lw=1.2, label="ORB-SLAM3 baseline")
         ax.plot(human["aligned"][:, 0], human["aligned"][:, 2], color="#2ca02c",
-                lw=1.2, label="HumanSLAM")
+                lw=1.2, label="HuMemSLAM")
         ax.set(title="Matched trajectory comparison — repetition 1",
                xlabel="x (m)", ylabel="z (m)")
         ax.axis("equal"); ax.grid(alpha=.25); ax.legend(); fig.tight_layout()
@@ -174,14 +172,14 @@ def main():
         ax.plot(base_ids, moving_mean(base["error"]), color="#1f77b4", lw=2,
                 label="ORB-SLAM3 baseline")
         ax.plot(human["frames"], moving_mean(human["error"]), color="#2ca02c",
-                lw=2, label="HumanSLAM")
+                lw=2, label="HuMemSLAM")
         ax.set(title="Matched translation APE — 25-frame means",
                xlabel="KITTI dataset frame", ylabel="SE(3)-aligned translation error (m)")
         ax.grid(alpha=.25); ax.legend(); fig.tight_layout()
         fig.savefig(output / "ape_comparison.png", dpi=200); plt.close(fig)
     else:
-        # Reset fragments cannot be placed into one ground-truth frame without
-        # fabricating unknown inter-map transformations.
+
+
         fig, ax = plt.subplots(figsize=(8, 7))
         for map_id in sorted(set(base["maps"].tolist())):
             xyz = base["estimate"][base["maps"] == map_id, :3, 3]

@@ -1,0 +1,10 @@
+{
+  "name": "places365_resnet50_embedding",
+  "engine_path": "../resnet50_places365_embed.engine",
+  "input_height": 224,
+  "input_width": 224,
+  "input_name": "input",
+  "output_name": "embedding",
+  "normalization": "ImageNet mean/std",
+  "precision": "TensorRT FP16-eligible"
+}

@@ -90,9 +90,9 @@ def load_model(args):
             backbone="ResNet18", fc_output_dim=512,
         )
     if args.model == "salad":
-        # The official inference hub unnecessarily imports its training-only
-        # Lightning/loss modules.  Supply minimal inference shims rather than
-        # installing an old training environment into the ROS runtime.
+
+
+
         if "pytorch_lightning" not in sys.modules:
             lightning = types.ModuleType("pytorch_lightning")
             class InferenceLightningModule(nn.Module):
@@ -119,8 +119,8 @@ def load_model(args):
 def build_engine(onnx_path, engine_path, workspace_gib):
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
-    # TensorRT 10/11 networks are explicitly batched by default and removed
-    # the legacy EXPLICIT_BATCH enum.
+
+
     network = builder.create_network(0)
     parser = trt.OnnxParser(network, logger)
     config = builder.create_builder_config()
@@ -130,7 +130,7 @@ def build_engine(onnx_path, engine_path, workspace_gib):
     if not parser.parse(onnx_path.read_bytes()):
         errors = "\n".join(str(parser.get_error(i)) for i in range(parser.num_errors))
         raise RuntimeError(f"TensorRT ONNX parser failed:\n{errors}")
-    # TensorRT 11 automatically chooses FP16 kernels where supported.
+
     serialized = builder.build_serialized_network(network, config)
     if serialized is None:
         raise RuntimeError("TensorRT engine build failed")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run reproducible 4Seasons baseline/HumanSLAM trials with saved outputs."""
+"""Run reproducible 4Seasons baseline/HuMemSLAM trials with saved outputs."""
 
 import argparse
 import os
@@ -9,6 +9,8 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+from monitor_hardware import HardwareMonitor
 
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,10 @@ def arguments():
         "--sequence", choices=("neighborhood_1_train", "neighborhood_3_train"),
         default="neighborhood_1_train",
     )
+    parser.add_argument(
+        "--sequence-dir", type=Path,
+        help="Prepared 4Seasons recording directory; overrides --sequence.",
+    )
     parser.add_argument("--mode", choices=("baseline", "humanslam", "both"), default="both")
     parser.add_argument("--dataset-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--results-root", type=Path, default=DEFAULT_RESULTS_ROOT)
@@ -35,9 +41,24 @@ def arguments():
     parser.add_argument("--start-frame", type=int, default=0)
     parser.add_argument("--end-frame", type=int, default=-1)
     parser.add_argument("--playback-rate", type=float, default=1.0)
+    parser.add_argument(
+        "--stereo-only", action="store_true",
+        help="Run ORB-SLAM3 in stereo mode without consuming IMU measurements.",
+    )
     parser.add_argument("--vocabulary", type=Path, default=DEFAULT_VOCABULARY)
     parser.add_argument("--settings", type=Path, default=DEFAULT_SETTINGS)
     parser.add_argument("--human-config", type=Path, default=DEFAULT_HUMAN_CONFIG)
+    parser.add_argument("--use-scene", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use-object", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use-text", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--skip-videos", action="store_true",
+        help="Keep numerical/event outputs but skip annotated/review videos.",
+    )
+    parser.add_argument(
+        "--skip-semantic-frames", action="store_true",
+        help="Do not save HuMemSLAM debug PNGs (recommended for repeated campaigns).",
+    )
     return parser.parse_args()
 
 
@@ -80,7 +101,7 @@ def wait_for_log(process, path, marker, timeout=120):
     raise TimeoutError(f"Timed out waiting for '{marker}' in {path}")
 
 
-def stop_process(process, timeout=20):
+def stop_process(process, timeout=180):
     if process is None or process.poll() is not None:
         return
     os.killpg(process.pid, signal.SIGINT)
@@ -101,6 +122,9 @@ def run_trial(args, sequence, root, assisted):
     label = "humanslam" if assisted else "baseline"
     output = root / label
     output.mkdir(parents=True, exist_ok=True)
+    monitor = HardwareMonitor(output, 5.0)
+    monitor.start()
+    trial_exit_code = 1
     environment = os.environ.copy()
     source_parent = str(PROJECT.parent)
     environment["PYTHONPATH"] = source_parent + os.pathsep + environment.get("PYTHONPATH", "")
@@ -113,11 +137,14 @@ def run_trial(args, sequence, root, assisted):
         "left_topic": "/dataset/left/image_raw",
         "right_topic": "/dataset/right/image_raw",
         "imu_topic": "/dataset/imu",
-        "use_imu": True,
+        "use_imu": not args.stereo_only,
         "semantic_assistance_enabled": assisted,
         "trajectory_output": output / "trajectory_kitti.txt",
         "latency_output": output / "orb_events_latency.csv",
+        "event_output": output / "orb_events.csv",
+        "keyframe_output": output / "orb_keyframes.csv",
         "tracked_features_output": output / "orb_tracked_features.csv",
+        "imu_diagnostics_output": output / "imu_diagnostics.csv",
     }.items():
         orb_command += ros_parameter(key, value)
 
@@ -127,12 +154,17 @@ def run_trial(args, sequence, root, assisted):
             sys.executable, "-m", "slam.human_slam_node", "--ros-args",
             "--params-file", str(args.human_config),
         ]
-        for key, value in {
+        human_parameters = {
             "latency_output": output / "human_latency.csv",
             "candidate_output": output / "human_candidates.csv",
-            "debug_output_dir": output / "semantic_frames",
             "source_image_dir": sequence / "undistorted_images/cam0",
-        }.items():
+            "use_scene": args.use_scene,
+            "use_object": args.use_object,
+            "use_text": args.use_text,
+        }
+        if not args.skip_semantic_frames:
+            human_parameters["debug_output_dir"] = output / "semantic_frames"
+        for key, value in human_parameters.items():
             human_command += ros_parameter(key, value)
 
     player_command = [
@@ -170,7 +202,7 @@ def run_trial(args, sequence, root, assisted):
         )
         if human is not None:
             wait_for_log(
-                human, output / "humanslam.log", "HumanSLAM active", timeout=180
+                human, output / "humanslam.log", "HuMemSLAM active", timeout=180
             )
         player = start_process(player_command, output / "player.log", environment, PROJECT.parent)
         processes.append(player)
@@ -178,39 +210,119 @@ def run_trial(args, sequence, root, assisted):
         if return_code:
             raise RuntimeError(f"Dataset player failed ({return_code}); inspect {output / 'player.log'}")
         time.sleep(2.0)
+        if orb.poll() not in (None, 0):
+            raise RuntimeError(
+                f"ORB-SLAM3 exited before playback completed ({orb.returncode}); "
+                f"inspect {output / 'orbslam3.log'}"
+            )
+        trial_exit_code = 0
     finally:
         for process in reversed(processes):
             stop_process(process)
         for process in processes:
             close_log(process)
+        monitor.stop(trial_exit_code)
 
-    video_command = [
-        sys.executable, str(PROJECT / "tools/render_slam_annotated_video.py"),
-        "--images", str(sequence / "undistorted_images/cam0"),
-        "--orb-events", str(output / "orb_events_latency.csv"),
-        "--orb-features", str(output / "orb_tracked_features.csv"),
-        "--output", str(output / f"{label}_annotated.mp4"),
-        "--label", "ORB-SLAM3 + HumanSLAM" if assisted else "ORB-SLAM3 baseline",
-        "--start-frame", str(args.start_frame),
-        "--end-frame", str(args.end_frame),
-    ]
-    if assisted:
-        video_command += ["--semantic-frames", str(output / "semantic_frames")]
-    subprocess.run(video_command, check=True, env=environment)
-    if assisted:
-        subprocess.run([
+    required_outputs = (
+        output / "trajectory_kitti.txt",
+        output / "trajectory_frame_ids.csv",
+        output / "orb_events.csv",
+        output / "orb_keyframes.csv",
+    )
+    missing_outputs = [path for path in required_outputs
+                       if not path.is_file() or path.stat().st_size == 0]
+    if missing_outputs:
+        raise RuntimeError(
+            "SLAM trial did not produce required outputs:\n"
+            + "\n".join(str(path) for path in missing_outputs)
+        )
+
+    if not args.skip_videos:
+        video_command = [
+            sys.executable, str(PROJECT / "tools/render_slam_annotated_video.py"),
+            "--images", str(sequence / "undistorted_images/cam0"),
+            "--orb-events", str(output / "orb_events_latency.csv"),
+            "--orb-features", str(output / "orb_tracked_features.csv"),
+            "--output", str(output / f"{label}_annotated.mp4"),
+            "--label", "ORB-SLAM3 + HuMemSLAM" if assisted else "ORB-SLAM3 baseline",
+            "--start-frame", str(args.start_frame),
+            "--end-frame", str(args.end_frame),
+        ]
+        if assisted and not args.skip_semantic_frames:
+            video_command += ["--semantic-frames", str(output / "semantic_frames")]
+        subprocess.run(video_command, check=True, env=environment)
+    if assisted and not args.skip_videos:
+        candidate_command = [
             sys.executable, str(PROJECT / "tools/render_candidate_matches.py"),
             "--candidates", str(output / "human_candidates.csv"),
             "--output", str(output / "humanslam_candidate_matches.mp4"),
             "--images", str(sequence / "undistorted_images/cam0"),
-            "--semantic-frames", str(output / "semantic_frames"),
+            "--frame-association", str(output / "trajectory_frame_ids.csv"),
+        ]
+        if not args.skip_semantic_frames:
+            candidate_command += ["--semantic-frames", str(output / "semantic_frames")]
+        subprocess.run([
+            *candidate_command,
+        ], check=True, env=environment)
+    subprocess.run([
+        sys.executable, str(PROJECT / "tools/evaluate_4seasons_aliasing.py"),
+        "--sequence", str(sequence),
+        "--events", str(output / "orb_events.csv"),
+        "--keyframes", str(output / "orb_keyframes.csv"),
+        "--frame-association", str(output / "trajectory_frame_ids.csv"),
+        "--output-dir", str(output / "aliasing_evaluation"),
+    ], check=True, env=environment)
+    if assisted:
+        subprocess.run([
+            sys.executable, str(PROJECT / "tools/evaluate_4seasons_retrieval.py"),
+            "--sequence", str(sequence),
+            "--candidates", str(output / "human_candidates.csv"),
+            "--keyframes", str(output / "orb_keyframes.csv"),
+            "--frame-association", str(output / "trajectory_frame_ids.csv"),
+            "--output", str(output / "loop_retrieval_metrics.json"),
+        ], check=True, env=environment)
+        subprocess.run([
+            sys.executable, str(PROJECT / "tools/evaluate_4seasons_retrieval.py"),
+            "--sequence", str(sequence),
+            "--candidates", str(output / "human_candidates.csv"),
+            "--keyframes", str(output / "orb_keyframes.csv"),
+            "--frame-association", str(output / "trajectory_frame_ids.csv"),
+            "--position-threshold-m", "15.0",
+            "--output", str(output / "loop_retrieval_overlap_metrics.json"),
+        ], check=True, env=environment)
+    else:
+        subprocess.run([
+            sys.executable, str(PROJECT / "tools/evaluate_4seasons_retrieval.py"),
+            "--sequence", str(sequence),
+            "--events", str(output / "orb_events.csv"),
+            "--keyframes", str(output / "orb_keyframes.csv"),
+            "--frame-association", str(output / "trajectory_frame_ids.csv"),
+            "--output", str(output / "loop_retrieval_metrics.json"),
+        ], check=True, env=environment)
+        subprocess.run([
+            sys.executable, str(PROJECT / "tools/evaluate_4seasons_retrieval.py"),
+            "--sequence", str(sequence),
+            "--events", str(output / "orb_events.csv"),
+            "--keyframes", str(output / "orb_keyframes.csv"),
+            "--frame-association", str(output / "trajectory_frame_ids.csv"),
+            "--position-threshold-m", "15.0",
+            "--output", str(output / "loop_retrieval_overlap_metrics.json"),
+        ], check=True, env=environment)
+    if not args.skip_videos:
+        subprocess.run([
+            sys.executable, str(PROJECT / "tools/render_4seasons_aliasing_review.py"),
+            "--sequence", str(sequence),
+            "--orb-log", str(output / "orbslam3.log"),
+            "--aliasing-events", str(output / "aliasing_evaluation/events.csv"),
+            "--output", str(output / f"{label}_aliasing_review.mp4"),
         ], check=True, env=environment)
     print(f"Completed {label}: {output}")
 
 
 def main():
     args = arguments()
-    sequence = sequence_directory(args.dataset_root.expanduser(), args.sequence)
+    sequence = (args.sequence_dir.expanduser().resolve() if args.sequence_dir
+                else sequence_directory(args.dataset_root.expanduser(), args.sequence))
     required = [
         sequence / "times.txt", sequence / "imu.txt",
         sequence / "undistorted_images/cam0", sequence / "undistorted_images/cam1",
@@ -222,7 +334,11 @@ def main():
     run_name = args.run_name or (
         datetime.now().strftime("%Y-%m-%d_%H%M%S") + f"_4seasons_{args.sequence}"
     )
-    root = args.results_root.expanduser() / run_name
+
+
+
+
+    root = (args.results_root.expanduser() / run_name).resolve()
     modes = (False, True) if args.mode == "both" else (args.mode == "humanslam",)
     for assisted in modes:
         run_trial(args, sequence, root, assisted)
