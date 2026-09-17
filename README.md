@@ -84,7 +84,6 @@ ros2_ws/
       kitti_dataset_player.py
       config/
       weights/
-      tools/
       docs/
       test/
       package.xml
@@ -493,9 +492,6 @@ monotonically increasing timestamps.
 
 ## Documentation
 
-- `docs/METHODOLOGY.md` — detailed method and experimental design.
-- `docs/SOFTWARE_TESTING.md` — verification strategy and recorded evidence.
-- `docs/GPU_OCR.md` — OCR/CUDA environment notes.
 - `weights/README.md` — model inventory and engine rebuild guidance.
 
 Datasets, model binaries, generated results, dissertation material,
