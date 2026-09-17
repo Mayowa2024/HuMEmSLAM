@@ -12,37 +12,6 @@ optimisation. It proposes where the camera may have been observed previously;
 ORB-SLAM3 remains responsible for proving the hypothesis and estimating the
 camera/map transformation.
 
-## Project status
-
-As of 17 September 2026, HuMemSLAM has repeatedly caused geometrically verified
-ORB-SLAM3 loop corrections with native LoopClosing BoW retrieval disabled. In
-the primary blur-15/dark-50 cohort it closed semantically in 10/10 runs and
-retained an evaluable trajectory in 10/10, but did not demonstrate significant
-APE superiority (`p=0.203`). Controlled experiments show that semantic
-retrieval can survive beyond ORB local correspondence; the final ORB geometry
-gate is the principal recovery bottleneck.
-
-Implemented and build-verified:
-
-- ORB-SLAM3 keyframe, pose, tracking-state and map-ID publication;
-- asynchronous EigenPlaces, object and OCR inference;
-- hierarchical semantic keyframe memory and retrieval;
-- scene/object/text single- and multi-layer ablations;
-- semantic candidate delivery to ORB-SLAM3;
-- PnP/geometrically verified relocalisation assistance;
-- cross-map semantic proposals using ORB-SLAM3 Sim(3) verification;
-- three-keyframe temporal consistency before Atlas map fusion;
-- KITTI-like offline stereo playback and trajectory output; and
-- 76 deterministic tests covering retrieval, fusion, scheduling and tools.
-
-The system is operational and has completed an end-to-end KITTI 06 run in which
-native loop-closing BoW retrieval was disabled, HuMemSLAM retrieved a genuine historical place, and
-ORB-SLAM3 accepted the proposal through unchanged Sim(3) geometry and applied
-the loop correction. In that paired run HuMemSLAM achieved 0.903 m aligned APE
-RMSE versus 1.433 m for native BoW. This proves functionality, not general
-superiority: repeated matched runs, ablations and additional datasets remain
-required for statistical claims.
-
 ## Motivation
 
 Geometry-centred SLAM can lose localisation under illumination, weather,
@@ -294,7 +263,7 @@ The recommended reproducible interface records commands, configuration, raw
 events, video inputs and available post-run metrics automatically:
 
 ```bash
-cd /home/teleopbike/Documents/Mayowa/ros2_ws/src/slam/slam
+cd /path/to/ros2_ws/src/slam/slam
 python3 tools/run_offline_benchmark.py \
   --dataset /path/to/sequence \
   --settings /path/to/orb_stereo_settings.yaml \
