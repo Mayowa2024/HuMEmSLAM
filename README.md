@@ -508,7 +508,4 @@ The ROS package declares Apache-2.0, but third-party components and model
 weights retain their own licences. Verify dataset, ORB-SLAM3, Places365,
 Ultralytics and PaddleOCR terms before redistribution.
 
-A formal project citation has not yet been published. If this repository
-supports an academic submission, cite the associated paper or dissertation and
-the upstream ORB-SLAM3, EigenPlaces, Places365, YOLO and OCR works used by the
-implementation.
+https://arxiv.org/abs/2609.17168
