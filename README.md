@@ -16,7 +16,8 @@ camera/map transformation.
 
 Geometry-centred SLAM can lose localisation under illumination, weather,
 viewpoint, blur and other appearance changes. Local visual structures can also
-look alike in physically different places. HuMemSLAM investigates whether cues
+look alike in physically different places. Modern SLAM approaches like Semantic SLAM and VPR have tried to curb this caveat by improving robustness in these situation. However, in real-world autonomy, robustness is not enough, low latency is also required.
+HuMemSLAM investigates whether cues
 similar to those used in human place recognition can complement geometry:
 
 1. **Scene-context attention** uses EigenPlaces embeddings to retrieve a broad
