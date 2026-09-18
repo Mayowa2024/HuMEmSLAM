@@ -85,7 +85,7 @@ ros2_ws/
       kitti_dataset_player.py
       config/
       weights/
-      docs/
+      tools/
       test/
       package.xml
       setup.py
